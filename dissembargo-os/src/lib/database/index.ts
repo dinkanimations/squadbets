@@ -5,4 +5,6 @@ export * from "./clients";
 export * from "./projects";
 export * from "./quotes";
 export * from "./production-schedules";
+export * from "./gmail-connections";
+export * from "./inbox";
 export * from "./utils";

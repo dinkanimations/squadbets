@@ -2,9 +2,10 @@ import {
   Calendar,
   ClipboardList,
   FileText,
-  Inbox,
   LayoutDashboard,
+  Mail,
   Settings,
+  Sparkles,
   Users,
   Clapperboard,
 } from "lucide-react";
@@ -12,7 +13,8 @@ import type { NavItem } from "@/types";
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Opportunities", href: "/opportunities", icon: Inbox },
+  { label: "Inbox", href: "/inbox", icon: Mail },
+  { label: "Opportunities", href: "/opportunities", icon: Sparkles },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Quotes", href: "/quotes", icon: FileText },
   {

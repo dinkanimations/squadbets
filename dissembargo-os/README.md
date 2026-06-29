@@ -35,6 +35,10 @@ Required variables:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
 | `NEXT_PUBLIC_SITE_URL` | App URL for auth redirects |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side operations (Gmail sync) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `CRON_SECRET` | Secures the Vercel cron sync endpoint |
 
 ### 3. Run database migrations
 

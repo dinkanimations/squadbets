@@ -356,6 +356,105 @@ export interface Database {
           },
         ];
       };
+      gmail_connections: {
+        Row: {
+          id: string;
+          user_id: string;
+          gmail_address: string;
+          access_token: string;
+          refresh_token: string;
+          token_expiry: string | null;
+          history_id: string | null;
+          last_sync_at: string | null;
+          last_sync_status: string;
+          last_sync_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          gmail_address: string;
+          access_token: string;
+          refresh_token: string;
+          token_expiry?: string | null;
+          history_id?: string | null;
+          last_sync_at?: string | null;
+          last_sync_status?: string;
+          last_sync_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          gmail_address?: string;
+          access_token?: string;
+          refresh_token?: string;
+          token_expiry?: string | null;
+          history_id?: string | null;
+          last_sync_at?: string | null;
+          last_sync_status?: string;
+          last_sync_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      inbox: {
+        Row: {
+          id: string;
+          user_id: string;
+          gmail_message_id: string;
+          thread_id: string | null;
+          subject: string | null;
+          sender_name: string | null;
+          sender_email: string | null;
+          recipient: string | null;
+          date_received: string;
+          body_plain: string | null;
+          body_html: string | null;
+          attachments: Json;
+          is_read: boolean;
+          imported_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          gmail_message_id: string;
+          thread_id?: string | null;
+          subject?: string | null;
+          sender_name?: string | null;
+          sender_email?: string | null;
+          recipient?: string | null;
+          date_received: string;
+          body_plain?: string | null;
+          body_html?: string | null;
+          attachments?: Json;
+          is_read?: boolean;
+          imported_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          gmail_message_id?: string;
+          thread_id?: string | null;
+          subject?: string | null;
+          sender_name?: string | null;
+          sender_email?: string | null;
+          recipient?: string | null;
+          date_received?: string;
+          body_plain?: string | null;
+          body_html?: string | null;
+          attachments?: Json;
+          is_read?: boolean;
+          imported_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -379,6 +478,16 @@ export type Project = Database["public"]["Tables"]["projects"]["Row"];
 export type Quote = Database["public"]["Tables"]["quotes"]["Row"];
 export type ProductionSchedule =
   Database["public"]["Tables"]["production_schedules"]["Row"];
+export type GmailConnection =
+  Database["public"]["Tables"]["gmail_connections"]["Row"];
+export type InboxEmail = Database["public"]["Tables"]["inbox"]["Row"];
+
+export type InboxAttachment = {
+  filename: string;
+  mimeType: string;
+  size: number;
+  attachmentId: string;
+};
 
 // Insert types
 export type CompanyInsert = Database["public"]["Tables"]["companies"]["Insert"];
@@ -390,6 +499,9 @@ export type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"];
 export type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
 export type ProductionScheduleInsert =
   Database["public"]["Tables"]["production_schedules"]["Insert"];
+export type GmailConnectionInsert =
+  Database["public"]["Tables"]["gmail_connections"]["Insert"];
+export type InboxEmailInsert = Database["public"]["Tables"]["inbox"]["Insert"];
 
 // Update types
 export type CompanyUpdate = Database["public"]["Tables"]["companies"]["Update"];
@@ -401,3 +513,6 @@ export type ProjectUpdate = Database["public"]["Tables"]["projects"]["Update"];
 export type QuoteUpdate = Database["public"]["Tables"]["quotes"]["Update"];
 export type ProductionScheduleUpdate =
   Database["public"]["Tables"]["production_schedules"]["Update"];
+export type GmailConnectionUpdate =
+  Database["public"]["Tables"]["gmail_connections"]["Update"];
+export type InboxEmailUpdate = Database["public"]["Tables"]["inbox"]["Update"];
