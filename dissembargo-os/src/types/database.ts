@@ -381,6 +381,8 @@ export interface Database {
           discount_value: number;
           total: number;
           is_archived: boolean;
+          expiry_date: string | null;
+          current_pdf_version_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -401,6 +403,8 @@ export interface Database {
           discount_value?: number;
           total?: number;
           is_archived?: boolean;
+          expiry_date?: string | null;
+          current_pdf_version_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -421,6 +425,8 @@ export interface Database {
           discount_value?: number;
           total?: number;
           is_archived?: boolean;
+          expiry_date?: string | null;
+          current_pdf_version_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -571,6 +577,41 @@ export interface Database {
             columns: ["section_id"];
             isOneToOne: false;
             referencedRelation: "quote_budget_sections";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quote_pdf_versions: {
+        Row: {
+          id: string;
+          quote_id: string;
+          version: number;
+          storage_path: string;
+          file_size: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_id: string;
+          version: number;
+          storage_path: string;
+          file_size?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          quote_id?: string;
+          version?: number;
+          storage_path?: string;
+          file_size?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_pdf_versions_quote_id_fkey";
+            columns: ["quote_id"];
+            isOneToOne: false;
+            referencedRelation: "quotes";
             referencedColumns: ["id"];
           },
         ];
@@ -826,6 +867,8 @@ export type QuoteBudgetSection =
   Database["public"]["Tables"]["quote_budget_sections"]["Row"];
 export type QuoteBudgetLineItem =
   Database["public"]["Tables"]["quote_budget_line_items"]["Row"];
+export type QuotePdfVersion =
+  Database["public"]["Tables"]["quote_pdf_versions"]["Row"];
 export type ProductionSchedule =
   Database["public"]["Tables"]["production_schedules"]["Row"];
 export type GmailConnection =
@@ -853,6 +896,8 @@ export type QuoteBudgetSectionInsert =
   Database["public"]["Tables"]["quote_budget_sections"]["Insert"];
 export type QuoteBudgetLineItemInsert =
   Database["public"]["Tables"]["quote_budget_line_items"]["Insert"];
+export type QuotePdfVersionInsert =
+  Database["public"]["Tables"]["quote_pdf_versions"]["Insert"];
 export type ProductionScheduleInsert =
   Database["public"]["Tables"]["production_schedules"]["Insert"];
 export type GmailConnectionInsert =
@@ -873,6 +918,8 @@ export type QuoteBudgetSectionUpdate =
   Database["public"]["Tables"]["quote_budget_sections"]["Update"];
 export type QuoteBudgetLineItemUpdate =
   Database["public"]["Tables"]["quote_budget_line_items"]["Update"];
+export type QuotePdfVersionUpdate =
+  Database["public"]["Tables"]["quote_pdf_versions"]["Update"];
 export type ProductionScheduleUpdate =
   Database["public"]["Tables"]["production_schedules"]["Update"];
 export type GmailConnectionUpdate =

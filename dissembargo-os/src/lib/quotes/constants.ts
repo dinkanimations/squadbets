@@ -35,6 +35,12 @@ export const DEFAULT_BUDGET_SECTIONS = [
   "Miscellaneous",
 ] as const;
 
+export function defaultExpiryDate(): string {
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
+  return date.toISOString().split("T")[0];
+}
+
 export type BudgetLineItemDraft = {
   id: string;
   description: string;
@@ -66,6 +72,7 @@ export type QuoteFormDraft = {
   status: QuoteStatus;
   discountType: DiscountType;
   discountValue: number;
+  expiryDate: string;
   deliverables: DeliverableDraft[];
   budgetSections: BudgetSectionDraft[];
 };
@@ -108,6 +115,7 @@ export function createEmptyQuoteDraft(): QuoteFormDraft {
     status: "draft",
     discountType: "fixed",
     discountValue: 0,
+    expiryDate: defaultExpiryDate(),
     deliverables: [createEmptyDeliverable()],
     budgetSections: createDefaultBudgetSections(),
   };

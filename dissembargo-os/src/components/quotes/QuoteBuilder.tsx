@@ -13,6 +13,7 @@ import { DeliverablesEditor } from "./DeliverablesEditor";
 import { BudgetEditor } from "./BudgetEditor";
 import { QuoteTotalsPanel } from "./QuoteTotalsPanel";
 import { QuoteStatusBadge } from "./QuoteStatusBadge";
+import { QuotePdfPanel } from "./QuotePdfPanel";
 import {
   archiveQuoteAction,
   createQuoteAction,
@@ -56,6 +57,7 @@ export function QuoteBuilder({
   quoteNumber,
   createdAt,
   initialDraft,
+  companies,
   initialContacts = [],
   initialOpportunities = [],
 }: QuoteBuilderProps) {
@@ -299,6 +301,12 @@ export function QuoteBuilder({
                 onChange={(e) => updateDraft({ clientName: e.target.value })}
                 placeholder="Client or company contact name"
               />
+              <Input
+                label="Expiry Date"
+                type="date"
+                value={draft.expiryDate}
+                onChange={(e) => updateDraft({ expiryDate: e.target.value })}
+              />
             </div>
 
             <div className="mt-4">
@@ -327,7 +335,15 @@ export function QuoteBuilder({
           />
         </div>
 
-        <QuoteTotalsPanel
+        <div className="space-y-6">
+          {mode === "edit" && quoteId && quoteNumber && (
+            <QuotePdfPanel
+              quoteId={quoteId}
+              quoteNumber={quoteNumber}
+              disabled={isPending}
+            />
+          )}
+          <QuoteTotalsPanel
           sections={draft.budgetSections}
           discountType={draft.discountType}
           discountValue={draft.discountValue}
@@ -336,6 +352,7 @@ export function QuoteBuilder({
             updateDraft({ discountValue })
           }
         />
+        </div>
       </div>
     </>
   );

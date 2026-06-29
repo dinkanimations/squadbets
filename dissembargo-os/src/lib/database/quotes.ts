@@ -21,7 +21,12 @@ export type QuoteBudgetSectionWithItems = QuoteBudgetSection & {
 };
 
 export type QuoteWithRelations = Quote & {
-  company: { id: string; company_name: string } | null;
+  company: {
+    id: string;
+    company_name: string;
+    website?: string | null;
+    logo_url?: string | null;
+  } | null;
   contact: { id: string; full_name: string } | null;
   opportunity: { id: string; subject: string | null } | null;
   project: { id: string; project_name: string } | null;
@@ -70,7 +75,7 @@ export async function getQuotesFiltered(
     .select(
       `
       *,
-      company:companies (id, company_name),
+      company:companies (id, company_name, website, logo_url),
       contact:contacts (id, full_name),
       opportunity:opportunities (id, subject),
       project:projects (id, project_name)
@@ -107,7 +112,7 @@ export async function getQuoteFullById(id: string): Promise<QuoteFull> {
     .select(
       `
       *,
-      company:companies (id, company_name),
+      company:companies (id, company_name, website, logo_url),
       contact:contacts (id, full_name),
       opportunity:opportunities (id, subject),
       project:projects (id, project_name)

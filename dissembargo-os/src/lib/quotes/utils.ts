@@ -1,4 +1,5 @@
 import type { QuoteFull } from "@/lib/database/quotes";
+import { defaultExpiryDate } from "./constants";
 import type { QuoteFormDraft } from "./constants";
 
 export function quoteToFormDraft(quote: QuoteFull): QuoteFormDraft {
@@ -13,6 +14,7 @@ export function quoteToFormDraft(quote: QuoteFull): QuoteFormDraft {
     status: quote.quote_status,
     discountType: quote.discount_type,
     discountValue: quote.discount_value,
+    expiryDate: quote.expiry_date ?? defaultExpiryDate(),
     deliverables:
       quote.deliverables.length > 0
         ? quote.deliverables.map((d) => ({

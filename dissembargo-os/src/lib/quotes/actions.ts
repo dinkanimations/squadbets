@@ -41,6 +41,7 @@ export type QuotePayload = {
   status: QuoteStatus;
   discountType: DiscountType;
   discountValue: number;
+  expiryDate: string;
   deliverables: DeliverableDraft[];
   budgetSections: BudgetSectionDraft[];
 };
@@ -132,6 +133,7 @@ export async function createQuoteAction(
       project_title: payload.projectTitle.trim() || null,
       client_name: payload.clientName.trim() || null,
       notes: payload.notes.trim() || null,
+      expiry_date: payload.expiryDate || null,
       quote_status: payload.status,
       subtotal,
       discount,
@@ -170,6 +172,7 @@ export async function updateQuoteAction(
       project_title: payload.projectTitle.trim() || null,
       client_name: payload.clientName.trim() || null,
       notes: payload.notes.trim() || null,
+      expiry_date: payload.expiryDate || null,
       quote_status: payload.status,
       subtotal,
       discount,
@@ -208,6 +211,7 @@ export async function duplicateQuoteAction(
       project_title: source.project_title,
       client_name: source.client_name,
       notes: source.notes,
+      expiry_date: source.expiry_date,
       quote_status: "draft",
       subtotal: source.subtotal,
       discount: source.discount,
