@@ -2,6 +2,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { InboxEmail } from "@/types/database";
 import type { AiClassificationResult } from "./constants";
 import { AI_CATEGORY_LABELS } from "./constants";
+import {
+  findOrCreateCompany,
+  findOrCreateContact,
+} from "@/lib/company-intelligence/find-or-create-company";
+import { enrichCompanyForOpportunity } from "@/lib/company-intelligence/enrich-company";
 
 export async function createOpportunityFromInbox(
   inbox: InboxEmail,
@@ -26,32 +31,18 @@ export async function createOpportunityFromInbox(
   const website =
     classification.website || inbox.detected_website || null;
 
-  const { data: company, error: companyError } = await admin
-    .from("companies")
-    .insert({
-      company_name: companyName,
-      website,
-    })
-    .select()
-    .single();
+  const company = await findOrCreateCompany({
+    companyName,
+    website,
+    emailBody: inbox.body_plain ?? inbox.body_html,
+    senderEmail: inbox.sender_email,
+  });
 
-  if (companyError) {
-    throw new Error(`Failed to create company: ${companyError.message}`);
-  }
-
-  const { data: contact, error: contactError } = await admin
-    .from("contacts")
-    .insert({
-      company_id: company.id,
-      full_name: contactName,
-      email: inbox.sender_email,
-    })
-    .select()
-    .single();
-
-  if (contactError) {
-    throw new Error(`Failed to create contact: ${contactError.message}`);
-  }
+  const contact = await findOrCreateContact(
+    company.id,
+    contactName,
+    inbox.sender_email,
+  );
 
   const aiCategory =
     overrides?.category || AI_CATEGORY_LABELS[classification.category];
@@ -81,9 +72,17 @@ export async function createOpportunityFromInbox(
     .update({
       opportunity_id: opportunity.id,
       detected_company_name: companyName,
-      detected_website: website,
+      detected_website: website ?? company.website,
     })
     .eq("id", inbox.id);
+
+  void enrichCompanyForOpportunity({
+    companyId: company.id,
+    companyName,
+    website: website ?? company.website,
+    emailBody: inbox.body_plain ?? inbox.body_html,
+    senderEmail: inbox.sender_email,
+  });
 
   return opportunity;
 }

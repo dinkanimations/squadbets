@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createCompany, getAllCompanies } from "@/lib/database/companies";
+import { getAllCompanies } from "@/lib/database/companies";
 import { createContact, getContactsByCompanyId } from "@/lib/database/contacts";
 import {
   createOpportunity,
@@ -10,6 +10,10 @@ import {
   updateOpportunity,
   updateOpportunityStatus,
 } from "@/lib/database/opportunities";
+import {
+  findOrCreateCompany,
+} from "@/lib/company-intelligence/find-or-create-company";
+import { enrichCompanyForOpportunity } from "@/lib/company-intelligence/enrich-company";
 import type { OpportunityStatus } from "@/types/database";
 
 export type OpportunityActionState = {
@@ -36,8 +40,22 @@ async function resolveCompanyAndContact(formData: FormData) {
       throw new Error("Company name is required.");
     }
 
-    const company = await createCompany({ company_name: companyName });
+    const website = String(formData.get("companyWebsite") ?? "").trim() || null;
+    const emailBody = String(formData.get("emailBody") ?? "").trim() || null;
+
+    const company = await findOrCreateCompany({
+      companyName,
+      website,
+      emailBody,
+    });
     companyId = company.id;
+
+    void enrichCompanyForOpportunity({
+      companyId: company.id,
+      companyName,
+      website: website ?? company.website,
+      emailBody,
+    });
   } else if (!companyId) {
     throw new Error("Please select a company.");
   }
@@ -113,6 +131,7 @@ export async function createOpportunityAction(
 
   revalidatePath("/opportunities");
   revalidatePath("/");
+  revalidatePath("/companies");
   redirect(`/opportunities/${opportunityId}`);
 }
 

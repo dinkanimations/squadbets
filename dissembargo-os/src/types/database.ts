@@ -59,6 +59,8 @@ export type StorageBucket =
   | "project-assets"
   | "documents";
 
+export type CompanyStatus = "active" | "archived";
+
 export interface Database {
   public: {
     Tables: {
@@ -98,6 +100,24 @@ export interface Database {
           ai_summary: string | null;
           estimated_size: string | null;
           headquarters: string | null;
+          logo_url: string | null;
+          products: string[];
+          services: string[];
+          key_markets: string[];
+          target_customers: string[];
+          creative_opportunities: string[];
+          suggested_services: string[];
+          executive_summary: string | null;
+          internal_notes: string | null;
+          status: CompanyStatus;
+          is_existing_client: boolean;
+          website_candidates: Json;
+          website_pending_selection: boolean;
+          ai_research_cached_at: string | null;
+          ai_research_raw: Json | null;
+          normalized_name: string | null;
+          website_domain: string | null;
+          manual_overrides: Json;
           created_at: string;
           updated_at: string;
         };
@@ -109,6 +129,24 @@ export interface Database {
           ai_summary?: string | null;
           estimated_size?: string | null;
           headquarters?: string | null;
+          logo_url?: string | null;
+          products?: string[];
+          services?: string[];
+          key_markets?: string[];
+          target_customers?: string[];
+          creative_opportunities?: string[];
+          suggested_services?: string[];
+          executive_summary?: string | null;
+          internal_notes?: string | null;
+          status?: CompanyStatus;
+          is_existing_client?: boolean;
+          website_candidates?: Json;
+          website_pending_selection?: boolean;
+          ai_research_cached_at?: string | null;
+          ai_research_raw?: Json | null;
+          normalized_name?: string | null;
+          website_domain?: string | null;
+          manual_overrides?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -120,6 +158,24 @@ export interface Database {
           ai_summary?: string | null;
           estimated_size?: string | null;
           headquarters?: string | null;
+          logo_url?: string | null;
+          products?: string[];
+          services?: string[];
+          key_markets?: string[];
+          target_customers?: string[];
+          creative_opportunities?: string[];
+          suggested_services?: string[];
+          executive_summary?: string | null;
+          internal_notes?: string | null;
+          status?: CompanyStatus;
+          is_existing_client?: boolean;
+          website_candidates?: Json;
+          website_pending_selection?: boolean;
+          ai_research_cached_at?: string | null;
+          ai_research_raw?: Json | null;
+          normalized_name?: string | null;
+          website_domain?: string | null;
+          manual_overrides?: Json;
           created_at?: string;
           updated_at?: string;
         };

@@ -178,13 +178,33 @@ export function OpportunityDetailClient({
               <div>
                 <dt className="text-muted">Company</dt>
                 <dd className="font-medium text-foreground">
-                  {opportunity.company?.company_name ?? "—"}
+                  {opportunity.company ? (
+                    <Link
+                      href={`/companies/${opportunity.company_id}`}
+                      className="hover:text-accent"
+                    >
+                      {opportunity.company.company_name}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
                 </dd>
               </div>
               <div>
                 <dt className="text-muted">Website</dt>
                 <dd className="text-foreground">
-                  {opportunity.company?.website ?? "—"}
+                  {opportunity.company?.website ? (
+                    <a
+                      href={opportunity.company.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:underline"
+                    >
+                      {opportunity.company.website.replace(/^https?:\/\//, "")}
+                    </a>
+                  ) : (
+                    "—"
+                  )}
                 </dd>
               </div>
               <div>

@@ -1,10 +1,11 @@
-import { ClipboardCheck, Mail, Sparkles, Target } from "lucide-react";
+import { Building2, ClipboardCheck, Mail, Sparkles, Target } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { countOpportunities } from "@/lib/database/opportunities";
 import {
   countInboxEmails,
   countOpportunitiesCreatedToday,
 } from "@/lib/database/inbox";
+import { countCompaniesThisMonth } from "@/lib/database/companies";
 import { DASHBOARD_PLACEHOLDER_STATS } from "@/lib/data/dummy";
 
 export async function DashboardStats() {
@@ -12,10 +13,12 @@ export async function DashboardStats() {
   let newEmailsCount = 0;
   let reviewQueueCount = 0;
   let opportunitiesTodayCount = 0;
+  let newCompaniesCount = 0;
   let opportunitiesError = false;
   let inboxError = false;
   let reviewError = false;
   let opportunitiesTodayError = false;
+  let companiesError = false;
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -44,6 +47,12 @@ export async function DashboardStats() {
     opportunitiesTodayCount = await countOpportunitiesCreatedToday();
   } catch {
     opportunitiesTodayError = true;
+  }
+
+  try {
+    newCompaniesCount = await countCompaniesThisMonth();
+  } catch {
+    companiesError = true;
   }
 
   return (
@@ -91,6 +100,17 @@ export async function DashboardStats() {
         }
         changeType={opportunitiesTodayError ? "negative" : "positive"}
         icon={Target}
+      />
+      <StatCard
+        title="New Companies This Month"
+        value={companiesError ? "—" : String(newCompaniesCount)}
+        change={
+          companiesError
+            ? "Unable to load from database"
+            : "Auto-enriched from opportunities"
+        }
+        changeType={companiesError ? "negative" : "neutral"}
+        icon={Building2}
       />
       {DASHBOARD_PLACEHOLDER_STATS.map((stat) => (
         <StatCard key={stat.title} {...stat} />

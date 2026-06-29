@@ -72,7 +72,7 @@ export function OpportunitiesTable({
             <TableRow key={opportunity.id}>
               <TableCell>
                 <Link
-                  href={`/opportunities/${opportunity.id}`}
+                  href={`/companies/${opportunity.company_id}`}
                   className="font-medium text-foreground hover:text-accent"
                 >
                   {opportunity.company?.company_name ?? "—"}
