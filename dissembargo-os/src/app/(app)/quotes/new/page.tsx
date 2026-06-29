@@ -9,10 +9,10 @@ export default async function NewQuotePage() {
     getSettingsAction(),
   ]);
 
-  return (
+    return (
     <QuoteBuilder
-      mode="create"
       companies={companies}
+      settings={settings}
       initialDraft={createEmptyQuoteDraftFromSettings(settings)}
     />
   );

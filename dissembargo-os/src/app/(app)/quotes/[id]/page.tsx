@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { QuoteBuilder } from "@/components/quotes/QuoteBuilder";
-import { getCompaniesForQuoteAction, getContactsForQuoteAction, getOpportunitiesForQuoteAction } from "@/lib/quotes/actions";
+import { getCompaniesForQuoteAction } from "@/lib/quotes/actions";
 import { getQuoteFullById } from "@/lib/database/quotes";
 import {
   createEmptyDeliverable,
@@ -18,8 +18,6 @@ export default async function QuoteDetailPage({ params }: QuoteDetailPageProps) 
 
   let quote;
   let companies;
-  let contacts: Awaited<ReturnType<typeof getContactsForQuoteAction>> = [];
-  let opportunities: Awaited<ReturnType<typeof getOpportunitiesForQuoteAction>> = [];
 
   try {
     [quote, companies] = await Promise.all([
@@ -32,13 +30,6 @@ export default async function QuoteDetailPage({ params }: QuoteDetailPageProps) 
 
   if (!quote) {
     notFound();
-  }
-
-  if (quote.company_id) {
-    [contacts, opportunities] = await Promise.all([
-      getContactsForQuoteAction(quote.company_id),
-      getOpportunitiesForQuoteAction(quote.company_id),
-    ]);
   }
 
   const formDraft = quoteToFormDraft(quote);
@@ -56,14 +47,12 @@ export default async function QuoteDetailPage({ params }: QuoteDetailPageProps) 
 
   return (
     <QuoteBuilder
-      mode="edit"
       quoteId={id}
       quoteNumber={quote.quote_number}
       createdAt={quote.created_at}
       initialDraft={formDraft}
       companies={companies}
-      initialContacts={contacts}
-      initialOpportunities={opportunities}
+      settings={settings}
     />
   );
 }

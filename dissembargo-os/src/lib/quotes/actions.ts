@@ -117,7 +117,7 @@ export async function getOpportunitiesForQuoteAction(companyId: string) {
 
 export async function createQuoteAction(
   payloadJson: string,
-): Promise<{ id?: string; error?: string }> {
+): Promise<{ id?: string; quoteNumber?: string; error?: string }> {
   try {
     const payload = parsePayload(payloadJson);
     const { subtotal, discount, total } = buildTotals(payload);
@@ -147,7 +147,7 @@ export async function createQuoteAction(
     revalidatePath("/quotes");
     revalidatePath("/");
 
-    return { id: quote.id };
+    return { id: quote.id, quoteNumber: quote.quote_number };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to create quote.",
@@ -211,7 +211,7 @@ export async function updateQuoteAction(
 
 export async function duplicateQuoteAction(
   quoteId: string,
-): Promise<{ id?: string; error?: string }> {
+): Promise<{ id?: string; quoteNumber?: string; error?: string }> {
   try {
     const source = await getQuoteFullById(quoteId);
     const quoteNumber = await generateQuoteNumber();
@@ -258,7 +258,7 @@ export async function duplicateQuoteAction(
     revalidatePath("/quotes");
     revalidatePath("/");
 
-    return { id: quote.id };
+    return { id: quote.id, quoteNumber: quote.quote_number };
   } catch (error) {
     return {
       error:
