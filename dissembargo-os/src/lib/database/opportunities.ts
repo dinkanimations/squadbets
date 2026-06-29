@@ -1,21 +1,72 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
-  Opportunity,
   OpportunityInsert,
   OpportunityStatus,
   OpportunityUpdate,
 } from "@/types/database";
+import type { OpportunitiesFilter } from "@/lib/opportunities/constants";
 import {
   getPaginationRange,
   handleDatabaseError,
-  type PaginationOptions,
 } from "./utils";
 
-export async function getOpportunities(
-  options?: PaginationOptions & { status?: OpportunityStatus },
-) {
+export async function getOpportunitiesFiltered(filters: OpportunitiesFilter = {}) {
   const supabase = await createClient();
-  const { from, to } = getPaginationRange(options ?? {});
+  const { from, to } = getPaginationRange({
+    page: filters.page,
+    pageSize: filters.pageSize ?? 50,
+  });
+
+  let matchingCompanyIds: string[] | undefined;
+
+  if (filters.search?.trim()) {
+    const searchTerm = `%${filters.search.trim()}%`;
+
+    const [{ data: companies }, { data: contacts }] = await Promise.all([
+      supabase.from("companies").select("id").ilike("company_name", searchTerm),
+      supabase.from("contacts").select("id").ilike("full_name", searchTerm),
+    ]);
+
+    matchingCompanyIds = companies?.map((company) => company.id);
+
+    const contactIds = contacts?.map((contact) => contact.id) ?? [];
+    const searchFilters = [
+      `subject.ilike.${searchTerm}`,
+      `notes.ilike.${searchTerm}`,
+    ];
+
+    if (matchingCompanyIds && matchingCompanyIds.length > 0) {
+      searchFilters.push(`company_id.in.(${matchingCompanyIds.join(",")})`);
+    }
+
+    if (contactIds.length > 0) {
+      searchFilters.push(`contact_id.in.(${contactIds.join(",")})`);
+    }
+
+    let query = supabase
+      .from("opportunities")
+      .select(
+        `
+        *,
+        company:companies (*),
+        contact:contacts (*)
+      `,
+        { count: "exact" },
+      )
+      .or(searchFilters.join(","))
+      .order("created_at", { ascending: filters.sort === "asc" })
+      .range(from, to);
+
+    if (filters.status) {
+      query = query.eq("opportunity_status", filters.status);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) handleDatabaseError(error, "Failed to fetch opportunities");
+
+    return { data, count: count ?? 0 };
+  }
 
   let query = supabase
     .from("opportunities")
@@ -27,11 +78,11 @@ export async function getOpportunities(
     `,
       { count: "exact" },
     )
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: filters.sort === "asc" })
     .range(from, to);
 
-  if (options?.status) {
-    query = query.eq("opportunity_status", options.status);
+  if (filters.status) {
+    query = query.eq("opportunity_status", filters.status);
   }
 
   const { data, error, count } = await query;
@@ -39,6 +90,26 @@ export async function getOpportunities(
   if (error) handleDatabaseError(error, "Failed to fetch opportunities");
 
   return { data, count: count ?? 0 };
+}
+
+export async function countOpportunities(options?: {
+  status?: OpportunityStatus;
+}) {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("opportunities")
+    .select("id", { count: "exact", head: true });
+
+  if (options?.status) {
+    query = query.eq("opportunity_status", options.status);
+  }
+
+  const { count, error } = await query;
+
+  if (error) handleDatabaseError(error, "Failed to count opportunities");
+
+  return count ?? 0;
 }
 
 export async function getOpportunityById(id: string) {
@@ -67,12 +138,18 @@ export async function createOpportunity(input: OpportunityInsert) {
   const { data, error } = await supabase
     .from("opportunities")
     .insert(input)
-    .select()
+    .select(
+      `
+      *,
+      company:companies (*),
+      contact:contacts (*)
+    `,
+    )
     .single();
 
   if (error) handleDatabaseError(error, "Failed to create opportunity");
 
-  return data as Opportunity;
+  return data;
 }
 
 export async function updateOpportunity(id: string, input: OpportunityUpdate) {
@@ -82,12 +159,18 @@ export async function updateOpportunity(id: string, input: OpportunityUpdate) {
     .from("opportunities")
     .update(input)
     .eq("id", id)
-    .select()
+    .select(
+      `
+      *,
+      company:companies (*),
+      contact:contacts (*)
+    `,
+    )
     .single();
 
   if (error) handleDatabaseError(error, `Failed to update opportunity ${id}`);
 
-  return data as Opportunity;
+  return data;
 }
 
 export async function deleteOpportunity(id: string) {
@@ -98,4 +181,11 @@ export async function deleteOpportunity(id: string) {
   if (error) handleDatabaseError(error, `Failed to delete opportunity ${id}`);
 
   return true;
+}
+
+export async function updateOpportunityStatus(
+  id: string,
+  status: OpportunityStatus,
+) {
+  return updateOpportunity(id, { opportunity_status: status });
 }

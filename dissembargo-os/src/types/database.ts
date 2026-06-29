@@ -8,10 +8,9 @@ export type Json =
 
 export type OpportunityStatus =
   | "new"
-  | "reviewing"
-  | "qualified"
   | "contacted"
-  | "proposal_sent"
+  | "quote_requested"
+  | "quote_sent"
   | "won"
   | "lost"
   | "archived";

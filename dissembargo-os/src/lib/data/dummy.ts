@@ -3,7 +3,6 @@ import {
   DollarSign,
   FileText,
   FolderKanban,
-  Sparkles,
 } from "lucide-react";
 import type {
   DeadlineItem,
@@ -12,14 +11,7 @@ import type {
   StatCardData,
 } from "@/types";
 
-export const DASHBOARD_STATS: StatCardData[] = [
-  {
-    title: "New Opportunities",
-    value: "24",
-    change: "AI-qualified this week",
-    changeType: "positive",
-    icon: Sparkles,
-  },
+export const DASHBOARD_PLACEHOLDER_STATS: StatCardData[] = [
   {
     title: "Active Projects",
     value: "18",

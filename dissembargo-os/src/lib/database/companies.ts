@@ -25,6 +25,19 @@ export async function getCompanies(options?: PaginationOptions) {
   return { data: data as Company[], count: count ?? 0 };
 }
 
+export async function getAllCompanies() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("companies")
+    .select("id, company_name")
+    .order("company_name", { ascending: true });
+
+  if (error) handleDatabaseError(error, "Failed to fetch companies");
+
+  return data;
+}
+
 export async function getCompanyById(id: string) {
   const supabase = await createClient();
 
