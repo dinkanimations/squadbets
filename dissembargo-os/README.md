@@ -62,6 +62,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Unauthenticated users are redirected to `/login`.
 
+### 5. Connect Gmail
+
+1. Create a Google Cloud project and enable the Gmail API
+2. Configure OAuth consent screen and create OAuth credentials (Web application)
+3. Add redirect URI: `{NEXT_PUBLIC_SITE_URL}/api/gmail/callback`
+4. Add credentials to `.env.local`
+5. Go to **Settings** in the app and click **Connect Gmail**
+
+Emails sync automatically every 5 minutes via Vercel Cron (`/api/cron/gmail-sync`).
+
 ## Supabase Architecture
 
 ### Database tables
@@ -76,6 +86,8 @@ Open [http://localhost:3000](http://localhost:3000). Unauthenticated users are r
 | `projects` | Client projects |
 | `quotes` | Project quotes |
 | `production_schedules` | Versioned schedule JSON per project |
+| `gmail_connections` | Gmail OAuth tokens per user (server-side) |
+| `inbox` | Imported Gmail emails (read-only sync) |
 
 ### Relationships
 

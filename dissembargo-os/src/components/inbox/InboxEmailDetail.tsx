@@ -11,6 +11,10 @@ import {
   formatDateTime,
   getSenderDisplay,
 } from "@/lib/inbox/utils";
+import {
+  AiCategoryBadge,
+  ConfidenceBadge,
+} from "@/components/ai/AiCategoryBadge";
 
 interface InboxEmailDetailProps {
   email: InboxEmail;
@@ -93,6 +97,67 @@ export function InboxEmailDetail({ email }: InboxEmailDetailProps) {
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader title="AI Classification" />
+            {email.ai_processing_status === "completed" ? (
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="text-muted">Category</dt>
+                  <dd className="mt-1">
+                    <AiCategoryBadge category={email.ai_category} />
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Confidence</dt>
+                  <dd className="mt-1">
+                    <ConfidenceBadge score={email.ai_confidence} />
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Summary</dt>
+                  <dd className="text-foreground">
+                    {email.ai_summary ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Reasoning</dt>
+                  <dd className="text-foreground">
+                    {email.ai_reasoning ?? "—"}
+                  </dd>
+                </div>
+                {email.opportunity_id && (
+                  <div>
+                    <dt className="text-muted">Linked Opportunity</dt>
+                    <dd>
+                      <Link
+                        href={`/opportunities/${email.opportunity_id}`}
+                        className="text-accent hover:underline"
+                      >
+                        View opportunity
+                      </Link>
+                    </dd>
+                  </div>
+                )}
+                {email.review_status === "pending_review" && (
+                  <div>
+                    <Link
+                      href="/review-queue"
+                      className="text-sm text-accent hover:underline"
+                    >
+                      Pending review →
+                    </Link>
+                  </div>
+                )}
+              </dl>
+            ) : email.ai_processing_status === "failed" ? (
+              <p className="text-sm text-danger">
+                {email.ai_processing_error ?? "AI processing failed."}
+              </p>
+            ) : (
+              <p className="text-sm text-muted">AI processing pending...</p>
+            )}
+          </Card>
+
           <Card>
             <CardHeader title="Attachments" />
             <AttachmentList attachments={attachments} />

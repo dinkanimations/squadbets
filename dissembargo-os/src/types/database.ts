@@ -32,6 +32,28 @@ export type ProjectStatus =
 
 export type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "expired";
 
+export type AiEmailCategory =
+  | "new_business_opportunity"
+  | "existing_client"
+  | "supplier"
+  | "invoice"
+  | "marketing"
+  | "recruitment"
+  | "spam"
+  | "other";
+
+export type InboxReviewStatus =
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "auto_created";
+
+export type AiProcessingStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed";
+
 export type StorageBucket =
   | "email-attachments"
   | "project-assets"
@@ -156,6 +178,7 @@ export interface Database {
           opportunity_status: OpportunityStatus;
           estimated_budget: number | null;
           notes: string | null;
+          inbox_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -170,6 +193,7 @@ export interface Database {
           opportunity_status?: OpportunityStatus;
           estimated_budget?: number | null;
           notes?: string | null;
+          inbox_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -184,6 +208,7 @@ export interface Database {
           opportunity_status?: OpportunityStatus;
           estimated_budget?: number | null;
           notes?: string | null;
+          inbox_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -418,6 +443,18 @@ export interface Database {
           is_read: boolean;
           imported_at: string;
           created_at: string;
+          ai_category: AiEmailCategory | null;
+          ai_confidence: number | null;
+          ai_summary: string | null;
+          ai_reasoning: string | null;
+          ai_signature: string | null;
+          ai_processed_at: string | null;
+          ai_processing_status: AiProcessingStatus;
+          ai_processing_error: string | null;
+          review_status: InboxReviewStatus | null;
+          opportunity_id: string | null;
+          detected_company_name: string | null;
+          detected_website: string | null;
         };
         Insert: {
           id?: string;
@@ -435,6 +472,18 @@ export interface Database {
           is_read?: boolean;
           imported_at?: string;
           created_at?: string;
+          ai_category?: AiEmailCategory | null;
+          ai_confidence?: number | null;
+          ai_summary?: string | null;
+          ai_reasoning?: string | null;
+          ai_signature?: string | null;
+          ai_processed_at?: string | null;
+          ai_processing_status?: AiProcessingStatus;
+          ai_processing_error?: string | null;
+          review_status?: InboxReviewStatus | null;
+          opportunity_id?: string | null;
+          detected_company_name?: string | null;
+          detected_website?: string | null;
         };
         Update: {
           id?: string;
@@ -452,6 +501,63 @@ export interface Database {
           is_read?: boolean;
           imported_at?: string;
           created_at?: string;
+          ai_category?: AiEmailCategory | null;
+          ai_confidence?: number | null;
+          ai_summary?: string | null;
+          ai_reasoning?: string | null;
+          ai_signature?: string | null;
+          ai_processed_at?: string | null;
+          ai_processing_status?: AiProcessingStatus;
+          ai_processing_error?: string | null;
+          review_status?: InboxReviewStatus | null;
+          opportunity_id?: string | null;
+          detected_company_name?: string | null;
+          detected_website?: string | null;
+        };
+        Relationships: [];
+      };
+      ai_classification_logs: {
+        Row: {
+          id: string;
+          inbox_id: string;
+          user_id: string;
+          ai_category: AiEmailCategory | null;
+          ai_confidence: number | null;
+          ai_summary: string | null;
+          ai_reasoning: string | null;
+          model: string;
+          prompt_version: string;
+          raw_response: Json | null;
+          action_taken: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          inbox_id: string;
+          user_id: string;
+          ai_category?: AiEmailCategory | null;
+          ai_confidence?: number | null;
+          ai_summary?: string | null;
+          ai_reasoning?: string | null;
+          model: string;
+          prompt_version?: string;
+          raw_response?: Json | null;
+          action_taken: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          inbox_id?: string;
+          user_id?: string;
+          ai_category?: AiEmailCategory | null;
+          ai_confidence?: number | null;
+          ai_summary?: string | null;
+          ai_reasoning?: string | null;
+          model?: string;
+          prompt_version?: string;
+          raw_response?: Json | null;
+          action_taken?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -463,6 +569,9 @@ export interface Database {
       client_status: ClientStatus;
       project_status: ProjectStatus;
       quote_status: QuoteStatus;
+      ai_email_category: AiEmailCategory;
+      inbox_review_status: InboxReviewStatus;
+      ai_processing_status: AiProcessingStatus;
     };
     CompositeTypes: Record<string, never>;
   };

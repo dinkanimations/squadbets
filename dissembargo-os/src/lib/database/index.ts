@@ -7,4 +7,5 @@ export * from "./quotes";
 export * from "./production-schedules";
 export * from "./gmail-connections";
 export * from "./inbox";
+export * from "./ai-logs";
 export * from "./utils";

@@ -6,6 +6,7 @@ import {
   refreshAccessToken,
 } from "./client";
 import { parseGmailMessage } from "./parse";
+import { processInboxEmail } from "@/lib/ai/process-inbox";
 
 export type SyncResult = {
   imported: number;
@@ -62,7 +63,7 @@ async function importMessage(
     .maybeSingle();
 
   if (existing) {
-    return "skipped";
+    return { status: "skipped" as const };
   }
 
   const { data: message } = await gmail.users.messages.get({
@@ -72,27 +73,32 @@ async function importMessage(
   });
 
   if (!message) {
-    return "skipped";
+    return { status: "skipped" as const };
   }
 
   if (!(message.labelIds ?? []).includes("INBOX")) {
-    return "skipped";
+    return { status: "skipped" as const };
   }
 
   const parsed = parseGmailMessage(message);
 
-  const { error } = await admin.from("inbox").insert({
-    user_id: userId,
-    ...parsed,
-    attachments: parsed.attachments,
-  });
+  const { data: inserted, error } = await admin
+    .from("inbox")
+    .insert({
+      user_id: userId,
+      ...parsed,
+      attachments: parsed.attachments,
+      ai_processing_status: "pending",
+    })
+    .select("id")
+    .single();
 
   if (error) {
-    if (error.code === "23505") return "skipped";
+    if (error.code === "23505") return { status: "skipped" as const };
     throw error;
   }
 
-  return "imported";
+  return { status: "imported" as const, inboxId: inserted.id };
 }
 
 async function listInboxMessageIds(
@@ -195,8 +201,20 @@ export async function syncGmailConnection(
         messageId,
       );
 
-      if (result === "imported") imported += 1;
-      else skipped += 1;
+      if (result.status === "imported") {
+        imported += 1;
+
+        try {
+          await processInboxEmail(result.inboxId);
+        } catch (processError) {
+          console.error(
+            `AI processing failed for inbox ${result.inboxId}:`,
+            processError,
+          );
+        }
+      } else {
+        skipped += 1;
+      }
     }
 
     await admin

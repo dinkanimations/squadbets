@@ -1,5 +1,6 @@
 import {
   Calendar,
+  ClipboardCheck,
   ClipboardList,
   FileText,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import type { NavItem } from "@/types";
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Inbox", href: "/inbox", icon: Mail },
+  { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
   { label: "Opportunities", href: "/opportunities", icon: Sparkles },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Quotes", href: "/quotes", icon: FileText },
