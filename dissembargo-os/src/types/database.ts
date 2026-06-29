@@ -32,6 +32,8 @@ export type ProjectStatus =
 
 export type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "expired";
 
+export type DiscountType = "percentage" | "fixed";
+
 export type AiEmailCategory =
   | "new_business_opportunity"
   | "existing_client"
@@ -364,31 +366,61 @@ export interface Database {
       quotes: {
         Row: {
           id: string;
-          project_id: string;
+          project_id: string | null;
+          quote_number: string;
+          company_id: string | null;
+          contact_id: string | null;
+          opportunity_id: string | null;
+          project_title: string | null;
+          client_name: string | null;
+          notes: string | null;
           quote_status: QuoteStatus;
           subtotal: number;
           discount: number;
+          discount_type: DiscountType;
+          discount_value: number;
           total: number;
+          is_archived: boolean;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
-          project_id: string;
+          project_id?: string | null;
+          quote_number: string;
+          company_id?: string | null;
+          contact_id?: string | null;
+          opportunity_id?: string | null;
+          project_title?: string | null;
+          client_name?: string | null;
+          notes?: string | null;
           quote_status?: QuoteStatus;
           subtotal?: number;
           discount?: number;
+          discount_type?: DiscountType;
+          discount_value?: number;
           total?: number;
+          is_archived?: boolean;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          project_id?: string;
+          project_id?: string | null;
+          quote_number?: string;
+          company_id?: string | null;
+          contact_id?: string | null;
+          opportunity_id?: string | null;
+          project_title?: string | null;
+          client_name?: string | null;
+          notes?: string | null;
           quote_status?: QuoteStatus;
           subtotal?: number;
           discount?: number;
+          discount_type?: DiscountType;
+          discount_value?: number;
           total?: number;
+          is_archived?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -398,6 +430,147 @@ export interface Database {
             columns: ["project_id"];
             isOneToOne: false;
             referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quotes_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quotes_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quotes_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quote_deliverables: {
+        Row: {
+          id: string;
+          quote_id: string;
+          title: string;
+          description: string | null;
+          quantity: number;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_id: string;
+          title?: string;
+          description?: string | null;
+          quantity?: number;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          quote_id?: string;
+          title?: string;
+          description?: string | null;
+          quantity?: number;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_deliverables_quote_id_fkey";
+            columns: ["quote_id"];
+            isOneToOne: false;
+            referencedRelation: "quotes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quote_budget_sections: {
+        Row: {
+          id: string;
+          quote_id: string;
+          name: string;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_id: string;
+          name: string;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          quote_id?: string;
+          name?: string;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_budget_sections_quote_id_fkey";
+            columns: ["quote_id"];
+            isOneToOne: false;
+            referencedRelation: "quotes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quote_budget_line_items: {
+        Row: {
+          id: string;
+          section_id: string;
+          description: string;
+          day_rate: number;
+          num_days: number;
+          total_cost: number;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          section_id: string;
+          description?: string;
+          day_rate?: number;
+          num_days?: number;
+          total_cost?: number;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          section_id?: string;
+          description?: string;
+          day_rate?: number;
+          num_days?: number;
+          total_cost?: number;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_budget_line_items_section_id_fkey";
+            columns: ["section_id"];
+            isOneToOne: false;
+            referencedRelation: "quote_budget_sections";
             referencedColumns: ["id"];
           },
         ];
@@ -619,12 +792,18 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      generate_quote_number: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+    };
     Enums: {
       opportunity_status: OpportunityStatus;
       client_status: ClientStatus;
       project_status: ProjectStatus;
       quote_status: QuoteStatus;
+      discount_type: DiscountType;
       ai_email_category: AiEmailCategory;
       inbox_review_status: InboxReviewStatus;
       ai_processing_status: AiProcessingStatus;
@@ -641,6 +820,12 @@ export type Opportunity = Database["public"]["Tables"]["opportunities"]["Row"];
 export type Client = Database["public"]["Tables"]["clients"]["Row"];
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 export type Quote = Database["public"]["Tables"]["quotes"]["Row"];
+export type QuoteDeliverable =
+  Database["public"]["Tables"]["quote_deliverables"]["Row"];
+export type QuoteBudgetSection =
+  Database["public"]["Tables"]["quote_budget_sections"]["Row"];
+export type QuoteBudgetLineItem =
+  Database["public"]["Tables"]["quote_budget_line_items"]["Row"];
 export type ProductionSchedule =
   Database["public"]["Tables"]["production_schedules"]["Row"];
 export type GmailConnection =
@@ -662,6 +847,12 @@ export type OpportunityInsert =
 export type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
 export type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"];
 export type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
+export type QuoteDeliverableInsert =
+  Database["public"]["Tables"]["quote_deliverables"]["Insert"];
+export type QuoteBudgetSectionInsert =
+  Database["public"]["Tables"]["quote_budget_sections"]["Insert"];
+export type QuoteBudgetLineItemInsert =
+  Database["public"]["Tables"]["quote_budget_line_items"]["Insert"];
 export type ProductionScheduleInsert =
   Database["public"]["Tables"]["production_schedules"]["Insert"];
 export type GmailConnectionInsert =
@@ -676,6 +867,12 @@ export type OpportunityUpdate =
 export type ClientUpdate = Database["public"]["Tables"]["clients"]["Update"];
 export type ProjectUpdate = Database["public"]["Tables"]["projects"]["Update"];
 export type QuoteUpdate = Database["public"]["Tables"]["quotes"]["Update"];
+export type QuoteDeliverableUpdate =
+  Database["public"]["Tables"]["quote_deliverables"]["Update"];
+export type QuoteBudgetSectionUpdate =
+  Database["public"]["Tables"]["quote_budget_sections"]["Update"];
+export type QuoteBudgetLineItemUpdate =
+  Database["public"]["Tables"]["quote_budget_line_items"]["Update"];
 export type ProductionScheduleUpdate =
   Database["public"]["Tables"]["production_schedules"]["Update"];
 export type GmailConnectionUpdate =

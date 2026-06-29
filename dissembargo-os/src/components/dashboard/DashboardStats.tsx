@@ -7,6 +7,7 @@ import {
 } from "@/lib/database/inbox";
 import { countCompaniesThisMonth } from "@/lib/database/companies";
 import { DASHBOARD_PLACEHOLDER_STATS } from "@/lib/data/dummy";
+import { QuoteStats } from "@/components/dashboard/QuoteStats";
 
 export async function DashboardStats() {
   let newOpportunitiesCount = 0;
@@ -112,6 +113,7 @@ export async function DashboardStats() {
         changeType={companiesError ? "negative" : "neutral"}
         icon={Building2}
       />
+      <QuoteStats />
       {DASHBOARD_PLACEHOLDER_STATS.map((stat) => (
         <StatCard key={stat.title} {...stat} />
       ))}

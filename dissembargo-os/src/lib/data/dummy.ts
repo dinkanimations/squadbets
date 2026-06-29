@@ -1,7 +1,6 @@
 import {
   CalendarClock,
   DollarSign,
-  FileText,
   FolderKanban,
 } from "lucide-react";
 import type {
@@ -18,13 +17,6 @@ export const DASHBOARD_PLACEHOLDER_STATS: StatCardData[] = [
     change: "3 launching this month",
     changeType: "neutral",
     icon: FolderKanban,
-  },
-  {
-    title: "Quotes Waiting",
-    value: "7",
-    change: "£142,500 total value",
-    changeType: "neutral",
-    icon: FileText,
   },
   {
     title: "Revenue Pipeline",

@@ -376,6 +376,8 @@ export function CompanyDetailClient({ profile }: CompanyDetailClientProps) {
               <Table>
                 <TableHead>
                   <TableRow>
+                    <TableHeaderCell>Quote</TableHeaderCell>
+                    <TableHeaderCell>Project</TableHeaderCell>
                     <TableHeaderCell>Status</TableHeaderCell>
                     <TableHeaderCell>Total</TableHeaderCell>
                   </TableRow>
@@ -383,6 +385,17 @@ export function CompanyDetailClient({ profile }: CompanyDetailClientProps) {
                 <TableBody>
                   {quotes.map((quote) => (
                     <TableRow key={quote.id}>
+                      <TableCell>
+                        <Link
+                          href={`/quotes/${quote.id}`}
+                          className="font-medium hover:text-accent"
+                        >
+                          {quote.quote_number}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-muted">
+                        {quote.project_title ?? "—"}
+                      </TableCell>
                       <TableCell>
                         <Badge>{quote.quote_status}</Badge>
                       </TableCell>

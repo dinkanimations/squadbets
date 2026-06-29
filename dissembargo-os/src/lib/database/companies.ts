@@ -139,10 +139,20 @@ export async function getCompanyProfile(id: string) {
 
   let quotes: Array<{
     id: string;
+    quote_number: string;
     quote_status: string;
     total: number;
-    project_id: string;
+    project_title: string | null;
   }> = [];
+
+  const { data: companyQuotes } = await supabase
+    .from("quotes")
+    .select("id, quote_number, quote_status, total, project_title")
+    .eq("company_id", id)
+    .eq("is_archived", false)
+    .order("created_at", { ascending: false });
+
+  quotes = companyQuotes ?? [];
 
   if (client) {
     const { data: projectData } = await supabase
@@ -152,17 +162,6 @@ export async function getCompanyProfile(id: string) {
       .order("created_at", { ascending: false });
 
     projects = projectData ?? [];
-
-    if (projects.length > 0) {
-      const projectIds = projects.map((p) => p.id);
-      const { data: quoteData } = await supabase
-        .from("quotes")
-        .select("id, quote_status, total, project_id")
-        .in("project_id", projectIds)
-        .order("created_at", { ascending: false });
-
-      quotes = quoteData ?? [];
-    }
   }
 
   return {

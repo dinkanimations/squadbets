@@ -15,9 +15,10 @@ export type CompanyProfileData = {
   }>;
   quotes: Array<{
     id: string;
+    quote_number: string;
     quote_status: string;
     total: number;
-    project_id: string;
+    project_title: string | null;
   }>;
   client: { id: string; client_status: string } | null;
 };
