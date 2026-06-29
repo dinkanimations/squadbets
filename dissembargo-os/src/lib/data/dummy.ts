@@ -1,7 +1,6 @@
 import {
   CalendarClock,
   DollarSign,
-  FolderKanban,
 } from "lucide-react";
 import type {
   DeadlineItem,
@@ -11,13 +10,6 @@ import type {
 } from "@/types";
 
 export const DASHBOARD_PLACEHOLDER_STATS: StatCardData[] = [
-  {
-    title: "Active Projects",
-    value: "18",
-    change: "3 launching this month",
-    changeType: "neutral",
-    icon: FolderKanban,
-  },
   {
     title: "Revenue Pipeline",
     value: "£486K",

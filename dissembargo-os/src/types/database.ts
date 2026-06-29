@@ -34,6 +34,15 @@ export type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "expired"
 
 export type DiscountType = "percentage" | "fixed";
 
+export type ScheduleStatus = "draft" | "active" | "archived";
+
+export type MilestoneType =
+  | "kick_off"
+  | "wip_review"
+  | "client_feedback"
+  | "client_approval"
+  | "final_delivery";
+
 export type AiEmailCategory =
   | "new_business_opportunity"
   | "existing_client"
@@ -619,24 +628,54 @@ export interface Database {
       production_schedules: {
         Row: {
           id: string;
-          project_id: string;
-          version: number;
+          project_id: string | null;
+          company_id: string | null;
+          opportunity_id: string | null;
+          quote_id: string | null;
+          project_title: string;
+          start_date: string | null;
+          delivery_date: string | null;
+          review_rounds: number;
+          deliverables: string[];
+          notes: string | null;
+          status: ScheduleStatus;
+          current_version: number;
           schedule_json: Json;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
-          project_id: string;
-          version?: number;
+          project_id?: string | null;
+          company_id?: string | null;
+          opportunity_id?: string | null;
+          quote_id?: string | null;
+          project_title?: string;
+          start_date?: string | null;
+          delivery_date?: string | null;
+          review_rounds?: number;
+          deliverables?: string[];
+          notes?: string | null;
+          status?: ScheduleStatus;
+          current_version?: number;
           schedule_json?: Json;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          project_id?: string;
-          version?: number;
+          project_id?: string | null;
+          company_id?: string | null;
+          opportunity_id?: string | null;
+          quote_id?: string | null;
+          project_title?: string;
+          start_date?: string | null;
+          delivery_date?: string | null;
+          review_rounds?: number;
+          deliverables?: string[];
+          notes?: string | null;
+          status?: ScheduleStatus;
+          current_version?: number;
           schedule_json?: Json;
           created_at?: string;
           updated_at?: string;
@@ -647,6 +686,62 @@ export interface Database {
             columns: ["project_id"];
             isOneToOne: false;
             referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "production_schedules_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "production_schedules_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "production_schedules_quote_id_fkey";
+            columns: ["quote_id"];
+            isOneToOne: false;
+            referencedRelation: "quotes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      production_schedule_versions: {
+        Row: {
+          id: string;
+          schedule_id: string;
+          version: number;
+          schedule_json: Json;
+          change_note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          schedule_id: string;
+          version: number;
+          schedule_json?: Json;
+          change_note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          schedule_id?: string;
+          version?: number;
+          schedule_json?: Json;
+          change_note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "production_schedule_versions_schedule_id_fkey";
+            columns: ["schedule_id"];
+            isOneToOne: false;
+            referencedRelation: "production_schedules";
             referencedColumns: ["id"];
           },
         ];
@@ -845,6 +940,7 @@ export interface Database {
       project_status: ProjectStatus;
       quote_status: QuoteStatus;
       discount_type: DiscountType;
+      schedule_status: ScheduleStatus;
       ai_email_category: AiEmailCategory;
       inbox_review_status: InboxReviewStatus;
       ai_processing_status: AiProcessingStatus;
@@ -871,6 +967,8 @@ export type QuotePdfVersion =
   Database["public"]["Tables"]["quote_pdf_versions"]["Row"];
 export type ProductionSchedule =
   Database["public"]["Tables"]["production_schedules"]["Row"];
+export type ProductionScheduleVersion =
+  Database["public"]["Tables"]["production_schedule_versions"]["Row"];
 export type GmailConnection =
   Database["public"]["Tables"]["gmail_connections"]["Row"];
 export type InboxEmail = Database["public"]["Tables"]["inbox"]["Row"];
@@ -900,6 +998,8 @@ export type QuotePdfVersionInsert =
   Database["public"]["Tables"]["quote_pdf_versions"]["Insert"];
 export type ProductionScheduleInsert =
   Database["public"]["Tables"]["production_schedules"]["Insert"];
+export type ProductionScheduleVersionInsert =
+  Database["public"]["Tables"]["production_schedule_versions"]["Insert"];
 export type GmailConnectionInsert =
   Database["public"]["Tables"]["gmail_connections"]["Insert"];
 export type InboxEmailInsert = Database["public"]["Tables"]["inbox"]["Insert"];
@@ -922,6 +1022,8 @@ export type QuotePdfVersionUpdate =
   Database["public"]["Tables"]["quote_pdf_versions"]["Update"];
 export type ProductionScheduleUpdate =
   Database["public"]["Tables"]["production_schedules"]["Update"];
+export type ProductionScheduleVersionUpdate =
+  Database["public"]["Tables"]["production_schedule_versions"]["Update"];
 export type GmailConnectionUpdate =
   Database["public"]["Tables"]["gmail_connections"]["Update"];
 export type InboxEmailUpdate = Database["public"]["Tables"]["inbox"]["Update"];
