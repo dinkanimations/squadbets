@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, ChevronDown } from "lucide-react";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { CURRENT_USER, NOTIFICATIONS } from "@/lib/data/dummy";
 import { Avatar } from "@/components/ui/Avatar";
 import { SearchInput } from "@/components/ui/SearchInput";
@@ -27,26 +28,31 @@ export function TopNav() {
           )}
         </button>
 
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-2 py-1.5",
-            "transition-colors duration-200 hover:bg-surface-elevated",
-          )}
-          aria-label="User profile menu"
-        >
-          <Avatar initials={CURRENT_USER.initials} size="sm" />
-          <div className="hidden text-left sm:block">
-            <p className="text-sm font-medium text-foreground">
-              {CURRENT_USER.name}
-            </p>
-            <p className="text-xs text-muted">{CURRENT_USER.role}</p>
+        <details className="relative">
+          <summary
+            className={cn(
+              "flex cursor-pointer list-none items-center gap-3 rounded-lg px-2 py-1.5",
+              "transition-colors duration-200 hover:bg-surface-elevated",
+              "[&::-webkit-details-marker]:hidden",
+            )}
+            aria-label="User profile menu"
+          >
+            <Avatar initials={CURRENT_USER.initials} size="sm" />
+            <div className="hidden text-left sm:block">
+              <p className="text-sm font-medium text-foreground">
+                {CURRENT_USER.name}
+              </p>
+              <p className="text-xs text-muted">{CURRENT_USER.role}</p>
+            </div>
+            <ChevronDown
+              className="hidden h-4 w-4 text-muted sm:block"
+              strokeWidth={1.75}
+            />
+          </summary>
+          <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-lg border border-border bg-card p-2 shadow-lg">
+            <SignOutButton />
           </div>
-          <ChevronDown
-            className="hidden h-4 w-4 text-muted sm:block"
-            strokeWidth={1.75}
-          />
-        </button>
+        </details>
       </div>
     </header>
   );
