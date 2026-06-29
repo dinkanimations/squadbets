@@ -59,6 +59,20 @@ export async function getClientById(id: string) {
   return data;
 }
 
+export async function getClientByCompanyId(companyId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (error) handleDatabaseError(error, "Failed to fetch client by company");
+
+  return data as Client | null;
+}
+
 export async function createClientRecord(input: ClientInsert) {
   const supabase = await createClient();
 

@@ -6,9 +6,9 @@ import {
   countOpportunitiesCreatedToday,
 } from "@/lib/database/inbox";
 import { countCompaniesThisMonth } from "@/lib/database/companies";
-import { DASHBOARD_PLACEHOLDER_STATS } from "@/lib/data/dummy";
 import { QuoteStats } from "@/components/dashboard/QuoteStats";
 import { ProductionScheduleStats } from "@/components/dashboard/ProductionScheduleStats";
+import { ProjectStats } from "@/components/dashboard/ProjectStats";
 
 export async function DashboardStats() {
   let newOpportunitiesCount = 0;
@@ -116,9 +116,7 @@ export async function DashboardStats() {
       />
       <QuoteStats />
       <ProductionScheduleStats />
-      {DASHBOARD_PLACEHOLDER_STATS.map((stat) => (
-        <StatCard key={stat.title} {...stat} />
-      ))}
+      <ProjectStats />
     </div>
   );
 }

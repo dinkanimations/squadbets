@@ -23,12 +23,15 @@ export type ClientStatus =
   | "churned";
 
 export type ProjectStatus =
-  | "draft"
-  | "active"
-  | "on_hold"
-  | "in_review"
-  | "completed"
-  | "cancelled";
+  | "planning"
+  | "in_progress"
+  | "waiting_for_client"
+  | "rendering"
+  | "review"
+  | "complete"
+  | "archived";
+
+export type ProjectPriority = "low" | "medium" | "high" | "urgent";
 
 export type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "expired";
 
@@ -335,30 +338,60 @@ export interface Database {
         Row: {
           id: string;
           client_id: string;
+          company_id: string | null;
+          contact_id: string | null;
+          opportunity_id: string | null;
+          quote_id: string | null;
           project_name: string;
           status: ProjectStatus;
           start_date: string | null;
           delivery_date: string | null;
+          producer: string | null;
+          team_members: string[];
+          priority: ProjectPriority;
+          budget: number | null;
+          notes: string | null;
+          progress: number;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           client_id: string;
+          company_id?: string | null;
+          contact_id?: string | null;
+          opportunity_id?: string | null;
+          quote_id?: string | null;
           project_name: string;
           status?: ProjectStatus;
           start_date?: string | null;
           delivery_date?: string | null;
+          producer?: string | null;
+          team_members?: string[];
+          priority?: ProjectPriority;
+          budget?: number | null;
+          notes?: string | null;
+          progress?: number;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           client_id?: string;
+          company_id?: string | null;
+          contact_id?: string | null;
+          opportunity_id?: string | null;
+          quote_id?: string | null;
           project_name?: string;
           status?: ProjectStatus;
           start_date?: string | null;
           delivery_date?: string | null;
+          producer?: string | null;
+          team_members?: string[];
+          priority?: ProjectPriority;
+          budget?: number | null;
+          notes?: string | null;
+          progress?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -368,6 +401,145 @@ export interface Database {
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "projects_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "projects_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "projects_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "projects_quote_id_fkey";
+            columns: ["quote_id"];
+            isOneToOne: false;
+            referencedRelation: "quotes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_deliverables: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          description: string | null;
+          is_complete: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title: string;
+          description?: string | null;
+          is_complete?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          title?: string;
+          description?: string | null;
+          is_complete?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_deliverables_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_notes: {
+        Row: {
+          id: string;
+          project_id: string;
+          content: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          content: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          content?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_notes_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_files: {
+        Row: {
+          id: string;
+          project_id: string;
+          file_name: string;
+          storage_path: string;
+          mime_type: string | null;
+          file_size: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          file_name: string;
+          storage_path: string;
+          mime_type?: string | null;
+          file_size?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          file_name?: string;
+          storage_path?: string;
+          mime_type?: string | null;
+          file_size?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_files_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
             referencedColumns: ["id"];
           },
         ];
@@ -983,6 +1155,7 @@ export interface Database {
       opportunity_status: OpportunityStatus;
       client_status: ClientStatus;
       project_status: ProjectStatus;
+      project_priority: ProjectPriority;
       quote_status: QuoteStatus;
       discount_type: DiscountType;
       schedule_status: ScheduleStatus;
@@ -1001,6 +1174,10 @@ export type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 export type Opportunity = Database["public"]["Tables"]["opportunities"]["Row"];
 export type Client = Database["public"]["Tables"]["clients"]["Row"];
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
+export type ProjectDeliverable =
+  Database["public"]["Tables"]["project_deliverables"]["Row"];
+export type ProjectNote = Database["public"]["Tables"]["project_notes"]["Row"];
+export type ProjectFile = Database["public"]["Tables"]["project_files"]["Row"];
 export type Quote = Database["public"]["Tables"]["quotes"]["Row"];
 export type QuoteDeliverable =
   Database["public"]["Tables"]["quote_deliverables"]["Row"];
@@ -1034,6 +1211,12 @@ export type OpportunityInsert =
   Database["public"]["Tables"]["opportunities"]["Insert"];
 export type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
 export type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"];
+export type ProjectDeliverableInsert =
+  Database["public"]["Tables"]["project_deliverables"]["Insert"];
+export type ProjectNoteInsert =
+  Database["public"]["Tables"]["project_notes"]["Insert"];
+export type ProjectFileInsert =
+  Database["public"]["Tables"]["project_files"]["Insert"];
 export type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
 export type QuoteDeliverableInsert =
   Database["public"]["Tables"]["quote_deliverables"]["Insert"];
@@ -1060,6 +1243,12 @@ export type OpportunityUpdate =
   Database["public"]["Tables"]["opportunities"]["Update"];
 export type ClientUpdate = Database["public"]["Tables"]["clients"]["Update"];
 export type ProjectUpdate = Database["public"]["Tables"]["projects"]["Update"];
+export type ProjectDeliverableUpdate =
+  Database["public"]["Tables"]["project_deliverables"]["Update"];
+export type ProjectNoteUpdate =
+  Database["public"]["Tables"]["project_notes"]["Update"];
+export type ProjectFileUpdate =
+  Database["public"]["Tables"]["project_files"]["Update"];
 export type QuoteUpdate = Database["public"]["Tables"]["quotes"]["Update"];
 export type QuoteDeliverableUpdate =
   Database["public"]["Tables"]["quote_deliverables"]["Update"];

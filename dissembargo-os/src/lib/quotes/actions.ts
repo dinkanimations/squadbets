@@ -161,6 +161,7 @@ export async function updateQuoteAction(
 ): Promise<QuoteActionState> {
   try {
     const payload = parsePayload(payloadJson);
+    const existing = await getQuoteFullById(quoteId);
     const { subtotal, discount, total } = buildTotals(payload);
     const { deliverables, sections } = mapChildren(payload);
 
@@ -183,8 +184,21 @@ export async function updateQuoteAction(
 
     await saveQuoteChildren(quoteId, deliverables, sections);
 
+    if (
+      payload.status === "approved" &&
+      existing.quote_status !== "approved" &&
+      !payload.projectId &&
+      !existing.project_id
+    ) {
+      const { createProjectFromQuote } = await import(
+        "@/lib/projects/create-from-quote"
+      );
+      await createProjectFromQuote(quoteId);
+    }
+
     revalidatePath("/quotes");
     revalidatePath(`/quotes/${quoteId}`);
+    revalidatePath("/projects");
     revalidatePath("/");
 
     return { success: "Quote saved successfully." };

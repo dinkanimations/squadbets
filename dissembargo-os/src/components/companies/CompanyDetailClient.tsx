@@ -351,7 +351,12 @@ export function CompanyDetailClient({ profile }: CompanyDetailClientProps) {
                   {projects.map((project) => (
                     <TableRow key={project.id}>
                       <TableCell className="font-medium">
-                        {project.project_name}
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="hover:text-accent"
+                        >
+                          {project.project_name}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         <Badge>{project.status}</Badge>
