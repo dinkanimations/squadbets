@@ -14,6 +14,7 @@ import { MilestoneEditor } from "./MilestoneEditor";
 import { ScheduleTimeline } from "./ScheduleTimeline";
 import { ScheduleStatusBadge } from "./ScheduleStatusBadge";
 import { ScheduleVersionPanel } from "./ScheduleVersionPanel";
+import { SchedulePdfPanel } from "./SchedulePdfPanel";
 import {
   archiveScheduleAction,
   createScheduleAction,
@@ -424,6 +425,14 @@ export function ScheduleBuilder({
               }
             />
           </>
+        )}
+
+        {mode === "edit" && scheduleId && (
+          <SchedulePdfPanel
+            scheduleId={scheduleId}
+            projectTitle={draft.projectTitle}
+            disabled={isPending}
+          />
         )}
 
         {mode === "edit" && scheduleId && versions.length > 0 && (

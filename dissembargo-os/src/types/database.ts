@@ -640,6 +640,7 @@ export interface Database {
           notes: string | null;
           status: ScheduleStatus;
           current_version: number;
+          current_pdf_version_id: string | null;
           schedule_json: Json;
           created_at: string;
           updated_at: string;
@@ -658,6 +659,7 @@ export interface Database {
           notes?: string | null;
           status?: ScheduleStatus;
           current_version?: number;
+          current_pdf_version_id?: string | null;
           schedule_json?: Json;
           created_at?: string;
           updated_at?: string;
@@ -676,6 +678,7 @@ export interface Database {
           notes?: string | null;
           status?: ScheduleStatus;
           current_version?: number;
+          current_pdf_version_id?: string | null;
           schedule_json?: Json;
           created_at?: string;
           updated_at?: string;
@@ -707,6 +710,48 @@ export interface Database {
             columns: ["quote_id"];
             isOneToOne: false;
             referencedRelation: "quotes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "production_schedules_current_pdf_version_id_fkey";
+            columns: ["current_pdf_version_id"];
+            isOneToOne: false;
+            referencedRelation: "production_schedule_pdf_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      production_schedule_pdf_versions: {
+        Row: {
+          id: string;
+          schedule_id: string;
+          version: number;
+          storage_path: string;
+          file_size: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          schedule_id: string;
+          version: number;
+          storage_path: string;
+          file_size?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          schedule_id?: string;
+          version?: number;
+          storage_path?: string;
+          file_size?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "production_schedule_pdf_versions_schedule_id_fkey";
+            columns: ["schedule_id"];
+            isOneToOne: false;
+            referencedRelation: "production_schedules";
             referencedColumns: ["id"];
           },
         ];
@@ -969,6 +1014,8 @@ export type ProductionSchedule =
   Database["public"]["Tables"]["production_schedules"]["Row"];
 export type ProductionScheduleVersion =
   Database["public"]["Tables"]["production_schedule_versions"]["Row"];
+export type ProductionSchedulePdfVersion =
+  Database["public"]["Tables"]["production_schedule_pdf_versions"]["Row"];
 export type GmailConnection =
   Database["public"]["Tables"]["gmail_connections"]["Row"];
 export type InboxEmail = Database["public"]["Tables"]["inbox"]["Row"];
@@ -1000,6 +1047,8 @@ export type ProductionScheduleInsert =
   Database["public"]["Tables"]["production_schedules"]["Insert"];
 export type ProductionScheduleVersionInsert =
   Database["public"]["Tables"]["production_schedule_versions"]["Insert"];
+export type ProductionSchedulePdfVersionInsert =
+  Database["public"]["Tables"]["production_schedule_pdf_versions"]["Insert"];
 export type GmailConnectionInsert =
   Database["public"]["Tables"]["gmail_connections"]["Insert"];
 export type InboxEmailInsert = Database["public"]["Tables"]["inbox"]["Insert"];
@@ -1024,6 +1073,8 @@ export type ProductionScheduleUpdate =
   Database["public"]["Tables"]["production_schedules"]["Update"];
 export type ProductionScheduleVersionUpdate =
   Database["public"]["Tables"]["production_schedule_versions"]["Update"];
+export type ProductionSchedulePdfVersionUpdate =
+  Database["public"]["Tables"]["production_schedule_pdf_versions"]["Update"];
 export type GmailConnectionUpdate =
   Database["public"]["Tables"]["gmail_connections"]["Update"];
 export type InboxEmailUpdate = Database["public"]["Tables"]["inbox"]["Update"];
