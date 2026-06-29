@@ -1,4 +1,5 @@
 import type { MilestoneType, ScheduleStatus } from "@/types/database";
+import type { AppSettingsData } from "@/lib/settings/types";
 
 export const SCHEDULE_STATUSES: ScheduleStatus[] = ["draft", "active", "archived"];
 
@@ -114,6 +115,31 @@ export function createEmptyScheduleDraft(): ScheduleFormDraft {
     startDate: today.toISOString().split("T")[0],
     deliveryDate: delivery.toISOString().split("T")[0],
     reviewRounds: 2,
+    deliverables: [""],
+    notes: "",
+    status: "draft",
+    scheduleData: { phases: [], milestones: [] },
+  };
+}
+
+export function createEmptyScheduleDraftFromSettings(
+  settings: AppSettingsData,
+): ScheduleFormDraft {
+  const today = new Date();
+  const delivery = new Date(today);
+  delivery.setDate(
+    delivery.getDate() + settings.defaultScheduleDurationDays,
+  );
+
+  return {
+    companyId: "",
+    opportunityId: "",
+    quoteId: "",
+    projectId: "",
+    projectTitle: "",
+    startDate: today.toISOString().split("T")[0],
+    deliveryDate: delivery.toISOString().split("T")[0],
+    reviewRounds: settings.defaultReviewRounds,
     deliverables: [""],
     notes: "",
     status: "draft",

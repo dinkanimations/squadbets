@@ -53,18 +53,20 @@ export function generateScheduleData(input: {
   deliveryDate: string;
   reviewRounds: number;
   phaseNames?: string[];
+  phaseWeights?: Record<string, number>;
 }): ScheduleData {
   const start = parseDate(input.startDate);
   const end = parseDate(input.deliveryDate);
   const totalDays = daysBetween(input.startDate, input.deliveryDate);
   const phaseNames = input.phaseNames ?? [...DEFAULT_PHASES];
+  const weights = input.phaseWeights ?? PHASE_WEIGHTS;
 
   const productionPhases = phaseNames.filter(
     (name) => name !== "Client Review" && name !== "Final Delivery",
   );
 
   const totalWeight = productionPhases.reduce(
-    (sum, name) => sum + (PHASE_WEIGHTS[name] ?? 1),
+    (sum, name) => sum + (weights[name] ?? 1),
     0,
   );
 
@@ -77,7 +79,7 @@ export function generateScheduleData(input: {
   let cursor = new Date(start);
 
   productionPhases.forEach((name, index) => {
-    const weight = PHASE_WEIGHTS[name] ?? 1;
+    const weight = weights[name] ?? 1;
     const duration = Math.max(
       1,
       Math.round((productionDays * weight) / totalWeight),

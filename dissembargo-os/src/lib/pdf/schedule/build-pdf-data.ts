@@ -6,7 +6,7 @@ import {
   parseScheduleData,
 } from "@/lib/production-schedules/calculations";
 import { MILESTONE_COLORS } from "@/lib/production-schedules/constants";
-import { PDF_BRAND } from "@/lib/pdf/quote/branding";
+import { getPdfBrand } from "@/lib/settings/loader";
 import { formatPdfDate } from "@/lib/pdf/quote/styles";
 import { PDF_PHASE_COLORS } from "./constants";
 import type { SchedulePdfData } from "./types";
@@ -28,6 +28,7 @@ function toPercent(value: number, total: number): number {
 export async function buildSchedulePdfData(
   schedule: ScheduleFull,
 ): Promise<SchedulePdfData> {
+  const brand = await getPdfBrand();
   const scheduleData = parseScheduleData(schedule.schedule_json);
   const startDate = schedule.start_date ?? "";
   const deliveryDate = schedule.delivery_date ?? "";
@@ -87,7 +88,11 @@ export async function buildSchedulePdfData(
     totalDurationDays,
     deliverables,
     notes: schedule.notes,
-    agencyName: PDF_BRAND.agencyName,
+    agencyName: brand.agencyName,
+    tagline: brand.tagline,
+    email: brand.email,
+    website: brand.website,
+    brand,
     weeks,
     phases,
     milestones,

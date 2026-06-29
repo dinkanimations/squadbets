@@ -33,6 +33,16 @@ export type ProjectStatus =
 
 export type ProjectPriority = "low" | "medium" | "high" | "urgent";
 
+export type UserRole =
+  | "administrator"
+  | "producer"
+  | "creative_director"
+  | "designer"
+  | "freelancer"
+  | "viewer";
+
+export type TeamMemberStatus = "active" | "inactive";
+
 export type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "expired";
 
 export type DiscountType = "percentage" | "fixed";
@@ -540,6 +550,173 @@ export interface Database {
             columns: ["project_id"];
             isOneToOne: false;
             referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      app_settings: {
+        Row: {
+          id: string;
+          company_name: string;
+          company_logo_url: string | null;
+          company_address: string | null;
+          company_email: string | null;
+          company_phone: string | null;
+          website: string | null;
+          default_currency: string;
+          timezone: string;
+          default_language: string;
+          quote_validity_days: number;
+          default_budget_sections: Json;
+          default_day_rates: Json;
+          default_discount_type: DiscountType;
+          default_discount_value: number;
+          default_terms: Json;
+          default_phases: Json;
+          phase_weights: Json;
+          default_milestones: Json;
+          default_review_rounds: number;
+          default_schedule_duration_days: number;
+          working_days: Json;
+          company_holidays: Json;
+          email_signature: string | null;
+          pdf_header_logo_url: string | null;
+          pdf_footer_text: string | null;
+          pdf_tagline: string | null;
+          pdf_colors: Json;
+          notify_email: boolean;
+          notify_deadlines: boolean;
+          notify_quote_approval: boolean;
+          notify_client_feedback: boolean;
+          notify_ai_processing: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          company_name?: string;
+          company_logo_url?: string | null;
+          company_address?: string | null;
+          company_email?: string | null;
+          company_phone?: string | null;
+          website?: string | null;
+          default_currency?: string;
+          timezone?: string;
+          default_language?: string;
+          quote_validity_days?: number;
+          default_budget_sections?: Json;
+          default_day_rates?: Json;
+          default_discount_type?: DiscountType;
+          default_discount_value?: number;
+          default_terms?: Json;
+          default_phases?: Json;
+          phase_weights?: Json;
+          default_milestones?: Json;
+          default_review_rounds?: number;
+          default_schedule_duration_days?: number;
+          working_days?: Json;
+          company_holidays?: Json;
+          email_signature?: string | null;
+          pdf_header_logo_url?: string | null;
+          pdf_footer_text?: string | null;
+          pdf_tagline?: string | null;
+          pdf_colors?: Json;
+          notify_email?: boolean;
+          notify_deadlines?: boolean;
+          notify_quote_approval?: boolean;
+          notify_client_feedback?: boolean;
+          notify_ai_processing?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          company_name?: string;
+          company_logo_url?: string | null;
+          company_address?: string | null;
+          company_email?: string | null;
+          company_phone?: string | null;
+          website?: string | null;
+          default_currency?: string;
+          timezone?: string;
+          default_language?: string;
+          quote_validity_days?: number;
+          default_budget_sections?: Json;
+          default_day_rates?: Json;
+          default_discount_type?: DiscountType;
+          default_discount_value?: number;
+          default_terms?: Json;
+          default_phases?: Json;
+          phase_weights?: Json;
+          default_milestones?: Json;
+          default_review_rounds?: number;
+          default_schedule_duration_days?: number;
+          working_days?: Json;
+          company_holidays?: Json;
+          email_signature?: string | null;
+          pdf_header_logo_url?: string | null;
+          pdf_footer_text?: string | null;
+          pdf_tagline?: string | null;
+          pdf_colors?: Json;
+          notify_email?: boolean;
+          notify_deadlines?: boolean;
+          notify_quote_approval?: boolean;
+          notify_client_feedback?: boolean;
+          notify_ai_processing?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      team_members: {
+        Row: {
+          id: string;
+          name: string;
+          email: string;
+          job_title: string | null;
+          day_rate: number | null;
+          department: string | null;
+          avatar_url: string | null;
+          status: TeamMemberStatus;
+          role: UserRole;
+          profile_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          email: string;
+          job_title?: string | null;
+          day_rate?: number | null;
+          department?: string | null;
+          avatar_url?: string | null;
+          status?: TeamMemberStatus;
+          role?: UserRole;
+          profile_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          email?: string;
+          job_title?: string | null;
+          day_rate?: number | null;
+          department?: string | null;
+          avatar_url?: string | null;
+          status?: TeamMemberStatus;
+          role?: UserRole;
+          profile_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "team_members_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1156,6 +1333,8 @@ export interface Database {
       client_status: ClientStatus;
       project_status: ProjectStatus;
       project_priority: ProjectPriority;
+      user_role: UserRole;
+      team_member_status: TeamMemberStatus;
       quote_status: QuoteStatus;
       discount_type: DiscountType;
       schedule_status: ScheduleStatus;
@@ -1178,6 +1357,8 @@ export type ProjectDeliverable =
   Database["public"]["Tables"]["project_deliverables"]["Row"];
 export type ProjectNote = Database["public"]["Tables"]["project_notes"]["Row"];
 export type ProjectFile = Database["public"]["Tables"]["project_files"]["Row"];
+export type AppSettings = Database["public"]["Tables"]["app_settings"]["Row"];
+export type TeamMember = Database["public"]["Tables"]["team_members"]["Row"];
 export type Quote = Database["public"]["Tables"]["quotes"]["Row"];
 export type QuoteDeliverable =
   Database["public"]["Tables"]["quote_deliverables"]["Row"];
@@ -1217,6 +1398,10 @@ export type ProjectNoteInsert =
   Database["public"]["Tables"]["project_notes"]["Insert"];
 export type ProjectFileInsert =
   Database["public"]["Tables"]["project_files"]["Insert"];
+export type AppSettingsInsert =
+  Database["public"]["Tables"]["app_settings"]["Insert"];
+export type TeamMemberInsert =
+  Database["public"]["Tables"]["team_members"]["Insert"];
 export type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
 export type QuoteDeliverableInsert =
   Database["public"]["Tables"]["quote_deliverables"]["Insert"];
@@ -1249,6 +1434,10 @@ export type ProjectNoteUpdate =
   Database["public"]["Tables"]["project_notes"]["Update"];
 export type ProjectFileUpdate =
   Database["public"]["Tables"]["project_files"]["Update"];
+export type AppSettingsUpdate =
+  Database["public"]["Tables"]["app_settings"]["Update"];
+export type TeamMemberUpdate =
+  Database["public"]["Tables"]["team_members"]["Update"];
 export type QuoteUpdate = Database["public"]["Tables"]["quotes"]["Update"];
 export type QuoteDeliverableUpdate =
   Database["public"]["Tables"]["quote_deliverables"]["Update"];

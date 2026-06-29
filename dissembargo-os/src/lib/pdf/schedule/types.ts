@@ -1,4 +1,5 @@
 import type { MilestoneType } from "@/types/database";
+import type { PdfBrandConfig } from "@/lib/settings/types";
 
 export type SchedulePdfPhase = {
   id: string;
@@ -41,6 +42,10 @@ export type SchedulePdfData = {
   deliverables: string[];
   notes: string | null;
   agencyName: string;
+  tagline: string;
+  email: string;
+  website: string;
+  brand: PdfBrandConfig;
   weeks: SchedulePdfWeek[];
   phases: SchedulePdfPhase[];
   milestones: SchedulePdfMilestone[];

@@ -1,5 +1,4 @@
 import { Text, View } from "@react-pdf/renderer";
-import { PDF_BRAND } from "@/lib/pdf/quote/branding";
 import { MILESTONE_TYPE_LABELS } from "@/lib/production-schedules/constants";
 import type { SchedulePdfData } from "./types";
 import { schedulePdfStyles } from "./styles";
@@ -8,16 +7,16 @@ export function PdfScheduleHeader({ data }: { data: SchedulePdfData }) {
   return (
     <View style={schedulePdfStyles.headerRow}>
       <View>
-        <Text style={schedulePdfStyles.agencyName}>{PDF_BRAND.agencyName}</Text>
-        <Text style={schedulePdfStyles.agencyTagline}>{PDF_BRAND.tagline}</Text>
+        <Text style={schedulePdfStyles.agencyName}>{data.agencyName}</Text>
+        <Text style={schedulePdfStyles.agencyTagline}>{data.tagline}</Text>
         <Text
           style={{
             fontSize: 8,
-            color: PDF_BRAND.colors.muted,
+            color: data.brand.colors.muted,
             marginTop: 4,
           }}
         >
-          {PDF_BRAND.email} · {PDF_BRAND.website}
+          {data.email} · {data.website}
         </Text>
       </View>
       <View style={{ alignItems: "flex-end" }}>
@@ -202,7 +201,7 @@ export function PdfScheduleFooter({ data }: { data: SchedulePdfData }) {
   return (
     <View style={schedulePdfStyles.footer} fixed>
       <Text style={schedulePdfStyles.footerText}>
-        {PDF_BRAND.agencyName} · {PDF_BRAND.email}
+        {data.brand.footerText ?? `${data.agencyName} · ${data.email}`}
       </Text>
       <Text style={schedulePdfStyles.footerText}>
         {data.projectTitle} · v{data.versionNumber}

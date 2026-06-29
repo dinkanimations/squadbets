@@ -4,21 +4,24 @@ import {
   calculateGrandTotal,
   calculateLineTotal,
 } from "@/lib/quotes/calculations";
-import { PDF_BRAND, DEFAULT_QUOTE_VALIDITY_DAYS } from "./branding";
+import { getPdfBrand, getQuoteValidityDays, getDefaultTerms } from "@/lib/settings/loader";
 import type { QuotePdfData } from "./types";
 import { formatPdfDate } from "./styles";
 
-function resolveExpiryDate(quote: QuoteFull): string {
+async function resolveExpiryDate(quote: QuoteFull): Promise<string> {
   if (quote.expiry_date) {
     return formatPdfDate(quote.expiry_date);
   }
 
+  const validityDays = await getQuoteValidityDays();
   const created = new Date(quote.created_at);
-  created.setDate(created.getDate() + DEFAULT_QUOTE_VALIDITY_DAYS);
+  created.setDate(created.getDate() + validityDays);
   return formatPdfDate(created);
 }
 
 export async function buildQuotePdfData(quote: QuoteFull): Promise<QuotePdfData> {
+  const brand = await getPdfBrand();
+  const terms = await getDefaultTerms();
   const budgetSections = quote.budget_sections
     .map((section) => {
       const lines = section.line_items
@@ -70,9 +73,15 @@ export async function buildQuotePdfData(quote: QuoteFull): Promise<QuotePdfData>
     clientName: quote.client_name ?? quote.company?.company_name ?? "Client",
     projectTitle: quote.project_title ?? "Project Quotation",
     issueDate: formatPdfDate(quote.created_at),
-    expiryDate: resolveExpiryDate(quote),
+    expiryDate: await resolveExpiryDate(quote),
     notes: quote.notes,
-    agencyName: PDF_BRAND.agencyName,
+    agencyName: brand.agencyName,
+    tagline: brand.tagline,
+    email: brand.email,
+    website: brand.website,
+    address: brand.address,
+    terms,
+    brand,
     deliverables,
     budgetSections,
     subtotal,

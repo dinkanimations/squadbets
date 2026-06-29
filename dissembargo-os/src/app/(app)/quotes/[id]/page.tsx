@@ -4,8 +4,9 @@ import { getCompaniesForQuoteAction, getContactsForQuoteAction, getOpportunities
 import { getQuoteFullById } from "@/lib/database/quotes";
 import {
   createEmptyDeliverable,
-  createDefaultBudgetSections,
+  createBudgetSectionsFromNames,
 } from "@/lib/quotes/constants";
+import { getSettingsAction } from "@/lib/settings/actions";
 import { quoteToFormDraft } from "@/lib/quotes/utils";
 
 interface QuoteDetailPageProps {
@@ -41,12 +42,16 @@ export default async function QuoteDetailPage({ params }: QuoteDetailPageProps) 
   }
 
   const formDraft = quoteToFormDraft(quote);
+  const settings = await getSettingsAction();
 
   if (formDraft.deliverables.length === 0) {
     formDraft.deliverables = [createEmptyDeliverable()];
   }
   if (formDraft.budgetSections.length === 0) {
-    formDraft.budgetSections = createDefaultBudgetSections();
+    formDraft.budgetSections = createBudgetSectionsFromNames(
+      settings.defaultBudgetSections,
+      settings.defaultDayRates,
+    );
   }
 
   return (

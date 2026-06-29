@@ -31,7 +31,7 @@ export function QuotePdfDocument({ data }: QuotePdfDocumentProps) {
         <PdfBudgetBreakdown data={data} />
         <PdfTotals data={data} />
         <PdfNotes data={data} />
-        <PdfTerms />
+        <PdfTerms data={data} />
         <PdfFooter data={data} />
       </Page>
     </Document>

@@ -1,4 +1,6 @@
 import type { DiscountType, QuoteStatus } from "@/types/database";
+import type { AppSettingsData } from "@/lib/settings/types";
+import { defaultExpiryDateFromDays } from "@/lib/settings/utils";
 
 export const QUOTE_STATUSES: QuoteStatus[] = [
   "draft",
@@ -87,11 +89,48 @@ export function createEmptyLineItem(): BudgetLineItemDraft {
 }
 
 export function createDefaultBudgetSections(): BudgetSectionDraft[] {
-  return DEFAULT_BUDGET_SECTIONS.map((name) => ({
+  return createBudgetSectionsFromNames([...DEFAULT_BUDGET_SECTIONS], {});
+}
+
+export function createBudgetSectionsFromNames(
+  sectionNames: string[],
+  dayRates: Record<string, number>,
+): BudgetSectionDraft[] {
+  return sectionNames.map((name) => ({
     id: crypto.randomUUID(),
     name,
-    lineItems: [createEmptyLineItem()],
+    lineItems: [
+      {
+        id: crypto.randomUUID(),
+        description: "",
+        dayRate: dayRates[name] ?? 0,
+        numDays: 0,
+      },
+    ],
   }));
+}
+
+export function createEmptyQuoteDraftFromSettings(
+  settings: AppSettingsData,
+): QuoteFormDraft {
+  return {
+    companyId: "",
+    contactId: "",
+    opportunityId: "",
+    projectId: "",
+    projectTitle: "",
+    clientName: "",
+    notes: "",
+    status: "draft",
+    discountType: settings.defaultDiscountType,
+    discountValue: settings.defaultDiscountValue,
+    expiryDate: defaultExpiryDateFromDays(settings.quoteValidityDays),
+    deliverables: [createEmptyDeliverable()],
+    budgetSections: createBudgetSectionsFromNames(
+      settings.defaultBudgetSections,
+      settings.defaultDayRates,
+    ),
+  };
 }
 
 export function createEmptyDeliverable(): DeliverableDraft {

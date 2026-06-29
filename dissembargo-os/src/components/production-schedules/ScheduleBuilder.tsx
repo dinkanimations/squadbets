@@ -44,6 +44,8 @@ interface ScheduleBuilderProps {
   currentVersion?: number;
   versions?: ProductionScheduleVersion[];
   initialDraft?: ScheduleFormDraft;
+  defaultPhaseNames?: string[];
+  defaultPhaseWeights?: Record<string, number>;
   companies: CompanyOption[];
   initialOpportunities?: OpportunityOption[];
   initialQuotes?: QuoteOption[];
@@ -56,6 +58,8 @@ export function ScheduleBuilder({
   currentVersion = 1,
   versions = [],
   initialDraft,
+  defaultPhaseNames,
+  defaultPhaseWeights,
   companies,
   initialOpportunities = [],
   initialQuotes = [],
@@ -102,6 +106,8 @@ export function ScheduleBuilder({
       startDate: draft.startDate,
       deliveryDate: draft.deliveryDate,
       reviewRounds: draft.reviewRounds,
+      phaseNames: defaultPhaseNames,
+      phaseWeights: defaultPhaseWeights,
     });
 
     updateDraft({ scheduleData });

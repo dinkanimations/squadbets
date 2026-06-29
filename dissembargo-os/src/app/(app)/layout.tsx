@@ -1,9 +1,19 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { getAppSettings } from "@/lib/database/app-settings";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AppShell>{children}</AppShell>;
+  const settings = await getAppSettings();
+
+  return (
+    <AppShell
+      companyName={settings.companyName}
+      companyTagline={settings.pdfTagline}
+    >
+      {children}
+    </AppShell>
+  );
 }

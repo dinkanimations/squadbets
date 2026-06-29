@@ -1,4 +1,5 @@
 import type { DiscountType } from "@/types/database";
+import type { PdfBrandConfig } from "@/lib/settings/types";
 
 export type QuotePdfDeliverable = {
   title: string;
@@ -27,6 +28,12 @@ export type QuotePdfData = {
   expiryDate: string;
   notes: string | null;
   agencyName: string;
+  tagline: string;
+  email: string;
+  website: string;
+  address: string;
+  terms: string[];
+  brand: PdfBrandConfig;
   deliverables: QuotePdfDeliverable[];
   budgetSections: QuotePdfBudgetSection[];
   subtotal: number;

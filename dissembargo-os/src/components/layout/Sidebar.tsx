@@ -5,20 +5,30 @@ import { usePathname } from "next/navigation";
 import { APP_NAME, NAV_ITEMS } from "@/lib/constants/navigation";
 import { cn } from "@/lib/utils/cn";
 
-export function Sidebar() {
+interface SidebarProps {
+  companyName?: string;
+  companyTagline?: string;
+}
+
+export function Sidebar({ companyName, companyTagline }: SidebarProps) {
   const pathname = usePathname();
+  const displayName = companyName ?? APP_NAME;
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-sidebar">
       <div className="flex h-16 items-center gap-3 border-b border-border px-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
-          <span className="text-sm font-bold text-white">D</span>
+          <span className="text-sm font-bold text-white">
+            {displayName.charAt(0).toUpperCase()}
+          </span>
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-foreground">
-            {APP_NAME}
+            {displayName}
           </p>
-          <p className="truncate text-xs text-muted">Creative Agency</p>
+          <p className="truncate text-xs text-muted">
+            {companyTagline ?? "Creative Agency"}
+          </p>
         </div>
       </div>
 

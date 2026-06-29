@@ -7,6 +7,7 @@ import {
 } from "@/lib/production-schedules/actions";
 import { getScheduleFullById } from "@/lib/database/production-schedules";
 import { scheduleToFormDraft } from "@/lib/production-schedules/utils";
+import { getSettingsAction } from "@/lib/settings/actions";
 
 interface ScheduleDetailPageProps {
   params: Promise<{ id: string }>;
@@ -44,6 +45,7 @@ export default async function ScheduleDetailPage({
   }
 
   const formDraft = scheduleToFormDraft(schedule);
+  const settings = await getSettingsAction();
 
   return (
     <ScheduleBuilder
@@ -53,6 +55,8 @@ export default async function ScheduleDetailPage({
       currentVersion={schedule.current_version}
       versions={schedule.versions}
       initialDraft={formDraft}
+      defaultPhaseNames={settings.defaultPhases}
+      defaultPhaseWeights={settings.phaseWeights}
       companies={companies}
       initialOpportunities={opportunities}
       initialQuotes={quotes}

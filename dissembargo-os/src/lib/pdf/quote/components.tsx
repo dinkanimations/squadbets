@@ -1,16 +1,15 @@
 import { Text, View } from "@react-pdf/renderer";
 import type { QuotePdfData } from "./types";
-import { PDF_BRAND, PDF_TERMS_AND_CONDITIONS } from "./branding";
 import { formatPdfCurrency, pdfStyles } from "./styles";
 
 export function PdfHeader({ data }: { data: QuotePdfData }) {
   return (
     <View style={pdfStyles.headerRow}>
       <View>
-        <Text style={pdfStyles.agencyName}>{PDF_BRAND.agencyName}</Text>
-        <Text style={pdfStyles.agencyTagline}>{PDF_BRAND.tagline}</Text>
-        <Text style={{ fontSize: 8, color: PDF_BRAND.colors.muted, marginTop: 4 }}>
-          {PDF_BRAND.email} · {PDF_BRAND.website}
+        <Text style={pdfStyles.agencyName}>{data.agencyName}</Text>
+        <Text style={pdfStyles.agencyTagline}>{data.tagline}</Text>
+        <Text style={{ fontSize: 8, color: data.brand.colors.muted, marginTop: 4 }}>
+          {data.email} · {data.website}
         </Text>
       </View>
       <View style={{ alignItems: "flex-end" }}>
@@ -75,11 +74,11 @@ export function PdfBudgetBreakdown({ data }: { data: QuotePdfData }) {
         <View key={section.name} wrap={false}>
           <Text
             style={{
-              fontFamily: PDF_BRAND.fonts.heading,
+              fontFamily: data.brand.fonts.heading,
               fontSize: 10,
               marginBottom: 6,
               marginTop: 4,
-              color: PDF_BRAND.colors.primary,
+              color: data.brand.colors.primary,
             }}
           >
             {section.name}
@@ -174,11 +173,11 @@ export function PdfNotes({ data }: { data: QuotePdfData }) {
   );
 }
 
-export function PdfTerms() {
+export function PdfTerms({ data }: { data: QuotePdfData }) {
   return (
     <View style={pdfStyles.termsSection} break>
       <Text style={pdfStyles.termsTitle}>Terms & Conditions</Text>
-      {PDF_TERMS_AND_CONDITIONS.map((term, index) => (
+      {data.terms.map((term, index) => (
         <Text key={index} style={pdfStyles.termItem}>
           {index + 1}. {term}
         </Text>
@@ -188,11 +187,12 @@ export function PdfTerms() {
 }
 
 export function PdfFooter({ data }: { data: QuotePdfData }) {
+  const footerLine =
+    data.brand.footerText ?? `${data.agencyName} · ${data.email}`;
+
   return (
     <View style={pdfStyles.footer} fixed>
-      <Text style={pdfStyles.footerText}>
-        {PDF_BRAND.agencyName} · {PDF_BRAND.email}
-      </Text>
+      <Text style={pdfStyles.footerText}>{footerLine}</Text>
       <Text style={pdfStyles.footerText}>{data.quoteNumber}</Text>
       <Text
         style={pdfStyles.footerText}
