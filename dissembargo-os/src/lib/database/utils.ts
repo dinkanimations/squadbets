@@ -1,0 +1,36 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
+
+export type SupabaseServerClient = SupabaseClient<Database>;
+
+export class DatabaseError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = "DatabaseError";
+  }
+}
+
+export function handleDatabaseError(
+  error: { message: string; code?: string } | null,
+  context: string,
+): never {
+  if (error) {
+    throw new DatabaseError(`${context}: ${error.message}`, error.code);
+  }
+
+  throw new DatabaseError(`${context}: Unknown database error`);
+}
+
+export type PaginationOptions = {
+  page?: number;
+  pageSize?: number;
+};
+
+export function getPaginationRange({ page = 1, pageSize = 25 }: PaginationOptions) {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  return { from, to, page, pageSize };
+}
