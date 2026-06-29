@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { AppSettings, AppSettingsUpdate, MilestoneType } from "@/types/database";
 import { handleDatabaseError } from "./utils";
@@ -103,6 +104,8 @@ export async function getAppSettings(): Promise<AppSettingsData> {
   if (!row) return STATIC_APP_SETTINGS;
   return mapAppSettingsRow(row);
 }
+
+export const getCachedAppSettings = cache(getAppSettings);
 
 export async function updateAppSettings(input: AppSettingsUpdate) {
   const supabase = await createClient();

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/auth/session";
 import {
   getAppSettings,
   updateAppSettings,
@@ -12,6 +13,9 @@ import {
   updateTeamMember,
 } from "@/lib/database/team-members";
 import { uploadFile, getSignedUrl } from "@/lib/storage";
+import {
+  assertBrandingAsset,
+} from "@/lib/storage/validation";
 import type {
   BrandingPayload,
   GeneralSettingsPayload,
@@ -26,6 +30,8 @@ export type SettingsActionState = {
   success?: string;
 };
 
+const MAX_BRANDING_FILE_SIZE = 5 * 1024 * 1024;
+
 export async function getSettingsAction() {
   return getAppSettings();
 }
@@ -38,6 +44,7 @@ export async function saveGeneralSettingsAction(
   payloadJson: string,
 ): Promise<SettingsActionState> {
   try {
+    await requireUser();
     const payload = JSON.parse(payloadJson) as GeneralSettingsPayload;
 
     await updateAppSettings({
@@ -70,6 +77,7 @@ export async function saveQuoteDefaultsAction(
   payloadJson: string,
 ): Promise<SettingsActionState> {
   try {
+    await requireUser();
     const payload = JSON.parse(payloadJson) as QuoteDefaultsPayload;
 
     await updateAppSettings({
@@ -97,6 +105,7 @@ export async function saveScheduleDefaultsAction(
   payloadJson: string,
 ): Promise<SettingsActionState> {
   try {
+    await requireUser();
     const payload = JSON.parse(payloadJson) as ScheduleDefaultsPayload;
 
     await updateAppSettings({
@@ -127,6 +136,7 @@ export async function saveNotificationsAction(
   payloadJson: string,
 ): Promise<SettingsActionState> {
   try {
+    await requireUser();
     const payload = JSON.parse(payloadJson) as NotificationsPayload;
 
     await updateAppSettings({
@@ -154,6 +164,7 @@ export async function saveBrandingAction(
   payloadJson: string,
 ): Promise<SettingsActionState> {
   try {
+    await requireUser();
     const payload = JSON.parse(payloadJson) as BrandingPayload;
 
     await updateAppSettings({
@@ -179,10 +190,13 @@ export async function uploadBrandingAssetAction(
   assetType: "company_logo" | "pdf_header_logo",
 ): Promise<{ url?: string; error?: string }> {
   try {
+    await requireUser();
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) {
       throw new Error("No file selected.");
     }
+
+    assertBrandingAsset(file, MAX_BRANDING_FILE_SIZE);
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = `branding/${assetType}/${crypto.randomUUID()}-${safeName}`;
@@ -222,6 +236,7 @@ export async function createTeamMemberAction(
   payloadJson: string,
 ): Promise<{ id?: string; error?: string }> {
   try {
+    await requireUser();
     const payload = JSON.parse(payloadJson) as TeamMemberPayload;
 
     if (!payload.name.trim() || !payload.email.trim()) {
@@ -255,6 +270,7 @@ export async function updateTeamMemberAction(
   payloadJson: string,
 ): Promise<SettingsActionState> {
   try {
+    await requireUser();
     const payload = JSON.parse(payloadJson) as TeamMemberPayload;
 
     await updateTeamMember(memberId, {
@@ -283,6 +299,7 @@ export async function deleteTeamMemberAction(
   memberId: string,
 ): Promise<SettingsActionState> {
   try {
+    await requireUser();
     await deleteTeamMember(memberId);
     revalidatePath("/settings/team");
     return { success: "Team member removed." };

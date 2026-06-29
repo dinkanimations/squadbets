@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LayoutDashboard } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RevenuePipeline } from "@/components/dashboard/RevenuePipeline";
@@ -6,7 +8,10 @@ import { IndustriesBreakdown } from "@/components/dashboard/IndustriesBreakdown"
 import { OpportunitiesByIndustry } from "@/components/dashboard/OpportunitiesByIndustry";
 import { UpcomingMilestones } from "@/components/dashboard/UpcomingMilestones";
 import { DeliveryDeadlinesWidget } from "@/components/dashboard/DeliveryDeadlinesWidget";
-import { LayoutDashboard } from "lucide-react";
+import {
+  CardListSkeleton,
+  StatGridSkeleton,
+} from "@/components/ui/PageSkeleton";
 
 export default function DashboardPage() {
   return (
@@ -18,21 +23,35 @@ export default function DashboardPage() {
       />
 
       <div className="space-y-6">
-        <DashboardStats />
+        <Suspense fallback={<StatGridSkeleton count={8} />}>
+          <DashboardStats />
+        </Suspense>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <RevenuePipeline />
-          <UpcomingDeadlines />
+          <Suspense fallback={<CardListSkeleton />}>
+            <RevenuePipeline />
+          </Suspense>
+          <Suspense fallback={<CardListSkeleton />}>
+            <UpcomingDeadlines />
+          </Suspense>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <IndustriesBreakdown />
-          <OpportunitiesByIndustry />
+          <Suspense fallback={<CardListSkeleton />}>
+            <IndustriesBreakdown />
+          </Suspense>
+          <Suspense fallback={<CardListSkeleton />}>
+            <OpportunitiesByIndustry />
+          </Suspense>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <UpcomingMilestones />
-          <DeliveryDeadlinesWidget />
+          <Suspense fallback={<CardListSkeleton />}>
+            <UpcomingMilestones />
+          </Suspense>
+          <Suspense fallback={<CardListSkeleton />}>
+            <DeliveryDeadlinesWidget />
+          </Suspense>
         </div>
       </div>
     </>

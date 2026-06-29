@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth/session";
 import { getAllCompanies } from "@/lib/database/companies";
 import { getContactsByCompanyId } from "@/lib/database/contacts";
 import { ensureClientForCompany } from "@/lib/projects/create-from-quote";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/database/projects";
 import { getQuotesFiltered } from "@/lib/database/quotes";
 import { deleteFile, uploadFile } from "@/lib/storage";
+import { assertAllowedMimeType } from "@/lib/storage/validation";
 import type { ProjectPriority } from "@/types/database";
 import {
   ALLOWED_FILE_TYPES,
@@ -93,6 +95,7 @@ export async function createProjectAction(
   payloadJson: string,
 ): Promise<{ id?: string; error?: string }> {
   try {
+    await requireUser();
     const payload = parsePayload(payloadJson);
     const clientId = await ensureClientForCompany(payload.companyId);
     const project = await createProjectRecord(mapProjectInput(payload, clientId));
@@ -120,6 +123,7 @@ export async function updateProjectAction(
   payloadJson: string,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     const payload = parsePayload(payloadJson);
     const clientId = await ensureClientForCompany(payload.companyId);
 
@@ -142,6 +146,7 @@ export async function archiveProjectAction(
   projectId: string,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     await archiveProject(projectId);
     revalidatePath("/projects");
     revalidatePath("/");
@@ -158,6 +163,7 @@ export async function createProjectFromQuoteAction(
   quoteId: string,
 ): Promise<{ id?: string; error?: string }> {
   try {
+    await requireUser();
     const project = await createProjectFromQuote(quoteId);
 
     revalidatePath("/projects");
@@ -187,6 +193,7 @@ export async function saveProjectDeliverablesAction(
   deliverablesJson: string,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     const items = JSON.parse(deliverablesJson) as DeliverablePayload[];
 
     await saveProjectDeliverables(
@@ -218,6 +225,7 @@ export async function addProjectNoteAction(
   content: string,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     if (!content.trim()) throw new Error("Note cannot be empty.");
     await createProjectNote(projectId, content.trim());
     revalidatePath(`/projects/${projectId}`);
@@ -235,6 +243,7 @@ export async function updateProjectNoteAction(
   content: string,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     if (!content.trim()) throw new Error("Note cannot be empty.");
     await updateProjectNote(noteId, content.trim());
     revalidatePath(`/projects/${projectId}`);
@@ -251,6 +260,7 @@ export async function deleteProjectNoteAction(
   noteId: string,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     await deleteProjectNote(noteId);
     revalidatePath(`/projects/${projectId}`);
     return { success: "Note deleted." };
@@ -266,6 +276,7 @@ export async function uploadProjectFileAction(
   formData: FormData,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     const file = formData.get("file");
 
     if (!(file instanceof File) || file.size === 0) {
@@ -276,14 +287,7 @@ export async function uploadProjectFileAction(
       throw new Error("File exceeds maximum size of 100 MB.");
     }
 
-    if (
-      file.type &&
-      !ALLOWED_FILE_TYPES.includes(
-        file.type as (typeof ALLOWED_FILE_TYPES)[number],
-      )
-    ) {
-      throw new Error("File type not allowed.");
-    }
+    assertAllowedMimeType(file, ALLOWED_FILE_TYPES);
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = `${projectId}/${crypto.randomUUID()}-${safeName}`;
@@ -315,6 +319,7 @@ export async function deleteProjectFileAction(
   fileId: string,
 ): Promise<ProjectActionState> {
   try {
+    await requireUser();
     const storagePath = await deleteProjectFileRecord(fileId);
 
     if (storagePath) {

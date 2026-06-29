@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Button } from "./Button";
 
@@ -19,6 +21,35 @@ export function Modal({
   children,
   size = "md",
 }: ModalProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+
+    const focusable = dialogRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    focusable?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
@@ -28,17 +59,27 @@ export function Modal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close modal"
+        tabIndex={-1}
       />
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className={`relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-xl border border-border bg-card shadow-xl ${
           size === "lg" ? "max-w-2xl" : "max-w-lg"
         }`}
       >
         <div className="flex items-start justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <h2 id={titleId} className="text-lg font-semibold text-foreground">
+              {title}
+            </h2>
             {description && (
-              <p className="mt-1 text-sm text-muted">{description}</p>
+              <p id={descriptionId} className="mt-1 text-sm text-muted">
+                {description}
+              </p>
             )}
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">

@@ -2,11 +2,11 @@ import { Suspense } from "react";
 import { Inbox } from "lucide-react";
 import { OpportunitiesPageClient } from "@/components/opportunities/OpportunitiesPageClient";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TableSkeleton } from "@/components/ui/PageSkeleton";
 import { getAllCompanies } from "@/lib/database/companies";
 import { getOpportunitiesFiltered } from "@/lib/database/opportunities";
 import type { OpportunityStatus } from "@/types/database";
 import type { OpportunityWithRelations, SortOrder } from "@/lib/opportunities/constants";
-import { OpportunitiesLoading } from "./OpportunitiesLoading";
 
 interface OpportunitiesPageProps {
   searchParams: Promise<{
@@ -22,7 +22,18 @@ export default async function OpportunitiesPage({
   const params = await searchParams;
 
   return (
-    <Suspense fallback={<OpportunitiesLoading />}>
+    <Suspense
+      fallback={
+        <>
+          <PageHeader
+            title="Opportunities"
+            description="Loading opportunities..."
+            icon={Inbox}
+          />
+          <TableSkeleton />
+        </>
+      }
+    >
       <OpportunitiesContent params={params} />
     </Suspense>
   );

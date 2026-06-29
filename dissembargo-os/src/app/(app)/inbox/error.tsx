@@ -1,8 +1,7 @@
 "use client";
 
-import { Card } from "@/components/ui/Card";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/Button";
+import { Mail } from "lucide-react";
+import { RouteError } from "@/components/ui/RouteError";
 
 export default function InboxError({
   error,
@@ -12,17 +11,12 @@ export default function InboxError({
   reset: () => void;
 }) {
   return (
-    <>
-      <PageHeader
-        title="Inbox"
-        description="Something went wrong while loading your inbox."
-      />
-      <Card className="p-6">
-        <p className="text-sm text-danger">{error.message}</p>
-        <Button className="mt-4" onClick={reset}>
-          Try again
-        </Button>
-      </Card>
-    </>
+    <RouteError
+      title="Inbox"
+      description="Something went wrong while loading your inbox."
+      error={error}
+      reset={reset}
+      icon={Mail}
+    />
   );
 }

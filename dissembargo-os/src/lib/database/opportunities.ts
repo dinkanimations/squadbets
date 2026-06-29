@@ -189,3 +189,50 @@ export async function updateOpportunityStatus(
 ) {
   return updateOpportunity(id, { opportunity_status: status });
 }
+
+const PIPELINE_STAGE_GROUPS: Array<{
+  stage: string;
+  statuses: OpportunityStatus[];
+}> = [
+  { stage: "Discovery", statuses: ["new", "contacted"] },
+  { stage: "Proposal", statuses: ["quote_requested"] },
+  { stage: "Negotiation", statuses: ["quote_sent"] },
+  { stage: "Closed Won", statuses: ["won"] },
+];
+
+export async function getOpportunityPipelineSummary() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select("opportunity_status, estimated_budget")
+    .not("opportunity_status", "in", '("lost","archived")');
+
+  if (error) handleDatabaseError(error, "Failed to fetch pipeline summary");
+
+  const rows = data ?? [];
+  const totalValue = rows.reduce(
+    (sum, row) => sum + Number(row.estimated_budget ?? 0),
+    0,
+  );
+
+  const stages = PIPELINE_STAGE_GROUPS.map((group) => {
+    const matches = rows.filter((row) =>
+      group.statuses.includes(row.opportunity_status),
+    );
+    const amount = matches.reduce(
+      (sum, row) => sum + Number(row.estimated_budget ?? 0),
+      0,
+    );
+
+    return {
+      stage: group.stage,
+      deals: matches.length,
+      amount,
+      percentage:
+        totalValue > 0 ? Math.round((amount / totalValue) * 100) : 0,
+    };
+  });
+
+  return { stages, totalValue };
+}

@@ -1,9 +1,8 @@
 "use client";
 
-import { ClipboardCheck } from "lucide-react";
 import { RouteError } from "@/components/ui/RouteError";
 
-export default function ReviewQueueError({
+export default function AppError({
   error,
   reset,
 }: {
@@ -12,11 +11,10 @@ export default function ReviewQueueError({
 }) {
   return (
     <RouteError
-      title="Review Queue"
-      description="Something went wrong while loading the review queue."
+      title="Error"
+      description="Something went wrong while loading this page."
       error={error}
       reset={reset}
-      icon={ClipboardCheck}
     />
   );
 }

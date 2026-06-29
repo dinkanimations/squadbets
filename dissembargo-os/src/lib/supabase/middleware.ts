@@ -5,8 +5,30 @@ import { hasSupabaseEnv } from "./env";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
+  const isApiRoute = pathname.startsWith("/api/");
+  const isPublicApiRoute = pathname.startsWith("/api/cron");
+  const isAuthRoute =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/auth");
 
   if (!hasSupabaseEnv()) {
+    if (process.env.NODE_ENV === "production") {
+      if (isApiRoute) {
+        return NextResponse.json(
+          { error: "Service configuration error." },
+          { status: 503 },
+        );
+      }
+
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("error", "configuration");
+      return NextResponse.redirect(loginUrl);
+    }
+
     return supabaseResponse;
   }
 
@@ -35,15 +57,11 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const isPublicApiRoute = pathname.startsWith("/api/cron");
-  const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/forgot-password") ||
-    pathname.startsWith("/reset-password") ||
-    pathname.startsWith("/auth");
-
   if (!user && !isAuthRoute && !isPublicApiRoute) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirectTo", pathname);
