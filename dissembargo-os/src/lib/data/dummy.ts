@@ -3,7 +3,7 @@ import {
   DollarSign,
   FileText,
   FolderKanban,
-  Target,
+  Sparkles,
 } from "lucide-react";
 import type {
   DeadlineItem,
@@ -14,11 +14,11 @@ import type {
 
 export const DASHBOARD_STATS: StatCardData[] = [
   {
-    title: "New Leads",
+    title: "New Opportunities",
     value: "24",
-    change: "+12% from last week",
+    change: "AI-qualified this week",
     changeType: "positive",
-    icon: Target,
+    icon: Sparkles,
   },
   {
     title: "Active Projects",
@@ -91,8 +91,9 @@ export const UPCOMING_DEADLINES: DeadlineItem[] = [
 export const NOTIFICATIONS: NotificationItem[] = [
   {
     id: "1",
-    title: "New lead assigned",
-    description: "Sarah Chen from Meridian Labs submitted an inquiry.",
+    title: "New opportunity qualified",
+    description:
+      "AI flagged an inquiry from Sarah Chen at Meridian Labs as high-fit.",
     time: "5m ago",
     read: false,
   },

@@ -2,9 +2,9 @@ import {
   Calendar,
   ClipboardList,
   FileText,
+  Inbox,
   LayoutDashboard,
   Settings,
-  Target,
   Users,
   Clapperboard,
 } from "lucide-react";
@@ -12,7 +12,7 @@ import type { NavItem } from "@/types";
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Leads", href: "/leads", icon: Target },
+  { label: "Opportunities", href: "/opportunities", icon: Inbox },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Quotes", href: "/quotes", icon: FileText },
   {

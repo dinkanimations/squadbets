@@ -28,7 +28,7 @@ src/
 ├── app/
 │   ├── (app)/              # Main application routes
 │   │   ├── page.tsx        # Dashboard
-│   │   ├── leads/
+│   │   ├── opportunities/
 │   │   ├── clients/
 │   │   ├── quotes/
 │   │   ├── production-schedules/
