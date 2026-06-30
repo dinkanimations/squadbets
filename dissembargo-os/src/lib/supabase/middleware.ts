@@ -2,10 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 import { hasSupabaseEnv } from "./env";
+import { isAuthDisabled } from "@/lib/auth/dev-bypass";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
+
+  if (isAuthDisabled()) {
+    return supabaseResponse;
+  }
   const isApiRoute = pathname.startsWith("/api/");
   const isPublicApiRoute = pathname.startsWith("/api/cron");
   const isAuthRoute =

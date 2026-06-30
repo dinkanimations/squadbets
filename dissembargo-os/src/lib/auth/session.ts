@@ -1,6 +1,11 @@
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
+import {
+  getDevProfile,
+  getDevUser,
+  isAuthDisabled,
+} from "@/lib/auth/dev-bypass";
 
 export async function getSession() {
   const supabase = await createClient();
@@ -17,6 +22,10 @@ export async function getSession() {
 }
 
 export async function getUser() {
+  if (isAuthDisabled()) {
+    return { user: getDevUser(), error: null };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -34,6 +43,10 @@ export async function getProfile(): Promise<{
   profile: Profile | null;
   error: AuthError | { message: string } | null;
 }> {
+  if (isAuthDisabled()) {
+    return { profile: getDevProfile(), error: null };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -54,6 +67,10 @@ export async function getProfile(): Promise<{
 }
 
 export async function requireUser() {
+  if (isAuthDisabled()) {
+    return getDevUser();
+  }
+
   const { user, error } = await getUser();
 
   if (error || !user) {

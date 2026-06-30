@@ -6,7 +6,7 @@ import {
   getSchedulePdfVersionById,
   uploadSchedulePdf,
 } from "@/lib/pdf/schedule/storage";
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/auth/session";
 
 interface RouteContext {
   params: Promise<{ id: string }>;

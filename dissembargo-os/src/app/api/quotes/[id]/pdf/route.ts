@@ -6,7 +6,7 @@ import {
   getQuotePdfVersionById,
   uploadQuotePdf,
 } from "@/lib/pdf/quote/storage";
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/auth/session";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -21,10 +21,7 @@ export async function GET(request: Request, context: RouteContext) {
   const save = searchParams.get("save") === "1";
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { user } = await getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -90,10 +87,7 @@ export async function POST(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { user } = await getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
