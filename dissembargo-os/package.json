@@ -9,8 +9,10 @@
     "lint": "eslint",
     "auth:verify": "node scripts/verify-auth.mjs",
     "auth:setup": "node scripts/setup-auth-env.mjs",
+    "setup": "node scripts/full-setup.mjs",
     "db:check": "node scripts/check-schema.mjs",
     "db:push": "supabase db push",
+    "db:bundle": "node scripts/bundle-migrations.mjs",
     "db:types": "supabase gen types typescript --local > src/types/database.generated.ts"
   },
   "dependencies": {
