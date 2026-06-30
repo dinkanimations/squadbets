@@ -39,6 +39,7 @@ const REQUIRED_TABLES = [
   "quotes",
   "production_schedules",
   "potential_opportunities",
+  "freelancers",
 ];
 
 if (!url || !key) {

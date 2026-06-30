@@ -42,15 +42,15 @@ const connectionCandidates = [
   `postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
   `postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@aws-0-eu-west-1.pooler.supabase.com:6543/postgres`,
   `postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres`,
-].filter((value): value is string => Boolean(value));
+].filter((value) => Boolean(value));
 
 const migrationsDir = resolve(process.cwd(), "supabase/migrations");
 const files = readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql"))
   .sort();
 
-let client: pg.Client | null = null;
-let lastError: unknown;
+let client = null;
+let lastError;
 
 for (const connectionString of connectionCandidates) {
   const candidate = new pg.Client({
