@@ -1,0 +1,15 @@
+import OpenAI from "openai";
+
+export function createOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing OPENAI_API_KEY environment variable.");
+  }
+
+  return new OpenAI({ apiKey });
+}
+
+export function hasOpenAIEnv(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY);
+}
