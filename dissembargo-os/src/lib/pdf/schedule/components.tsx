@@ -1,7 +1,54 @@
 import { Text, View } from "@react-pdf/renderer";
-import { MILESTONE_TYPE_LABELS } from "@/lib/production-schedules/constants";
-import type { SchedulePdfData } from "./types";
+import type { SchedulePdfData, SchedulePdfMilestone } from "./types";
 import { schedulePdfStyles } from "./styles";
+
+function pdfMilestoneShapeStyle(milestone: SchedulePdfMilestone) {
+  if (milestone.shape === "circle") {
+    return { borderRadius: 999 };
+  }
+  if (milestone.shape === "square") {
+    return { transform: undefined };
+  }
+  return { transform: "rotate(45deg)" };
+}
+
+function PdfMilestoneGlyph({ milestone }: { milestone: SchedulePdfMilestone }) {
+  if (milestone.icon?.trim()) {
+    return (
+      <View
+        style={{
+          position: "absolute",
+          left: `${milestone.leftPercent}%`,
+          top: 2,
+          transform: "translateX(-4px)",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 8,
+            color: milestone.color,
+            fontWeight: 700,
+          }}
+        >
+          {milestone.icon}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        schedulePdfStyles.milestoneDiamond,
+        pdfMilestoneShapeStyle(milestone),
+        {
+          left: `${milestone.leftPercent}%`,
+          backgroundColor: milestone.color,
+        },
+      ]}
+    />
+  );
+}
 
 export function PdfScheduleHeader({ data }: { data: SchedulePdfData }) {
   return (
@@ -135,37 +182,38 @@ export function PdfScheduleTimeline({ data }: { data: SchedulePdfData }) {
         <Text style={schedulePdfStyles.phaseLabel}>Milestones</Text>
         <View style={schedulePdfStyles.milestoneTrack}>
           {data.milestones.map((milestone) => (
-            <View
-              key={milestone.id}
-              style={[
-                schedulePdfStyles.milestoneDiamond,
-                {
-                  left: `${milestone.leftPercent}%`,
-                  backgroundColor: milestone.color,
-                },
-              ]}
-            />
+            <PdfMilestoneGlyph key={milestone.id} milestone={milestone} />
           ))}
         </View>
       </View>
 
-      <View style={schedulePdfStyles.legendRow}>
-        {Object.entries(MILESTONE_TYPE_LABELS).map(([type, label]) => {
-          const sample = data.milestones.find((m) => m.type === type);
-          if (!sample) return null;
-          return (
-            <View key={type} style={schedulePdfStyles.legendItem}>
-              <View
-                style={[
-                  schedulePdfStyles.legendDiamond,
-                  { backgroundColor: sample.color },
-                ]}
-              />
-              <Text style={schedulePdfStyles.legendText}>{label}</Text>
+      {data.milestones.length > 0 ? (
+        <View style={schedulePdfStyles.legendRow}>
+          {data.milestones.map((milestone) => (
+            <View key={milestone.id} style={schedulePdfStyles.legendItem}>
+              {milestone.icon?.trim() ? (
+                <Text
+                  style={[
+                    schedulePdfStyles.legendText,
+                    { color: milestone.color, fontWeight: 700 },
+                  ]}
+                >
+                  {milestone.icon}
+                </Text>
+              ) : (
+                <View
+                  style={[
+                    schedulePdfStyles.legendDiamond,
+                    pdfMilestoneShapeStyle(milestone),
+                    { backgroundColor: milestone.color },
+                  ]}
+                />
+              )}
+              <Text style={schedulePdfStyles.legendText}>{milestone.label}</Text>
             </View>
-          );
-        })}
-      </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -305,14 +305,23 @@ export function ScheduleBuilder({
 
     updateDraft({
       scheduleData: normalizeScheduleData({
-        ...generated,
+        phases: generated.phases,
+        milestones:
+          draft.scheduleData.milestones.length > 0
+            ? draft.scheduleData.milestones
+            : generated.milestones,
         workingDays: draft.scheduleData.workingDays,
         companyHolidays: draft.scheduleData.companyHolidays,
         shutdownPeriods: draft.scheduleData.shutdownPeriods,
         milestoneLegend: draft.scheduleData.milestoneLegend,
       }),
     });
-    showToast("Timeline regenerated from dates.", "success");
+    showToast(
+      draft.scheduleData.milestones.length > 0
+        ? "Phases regenerated — your milestones were kept."
+        : "Timeline regenerated from dates.",
+      "success",
+    );
   };
 
   const handleGeneratePdf = async () => {

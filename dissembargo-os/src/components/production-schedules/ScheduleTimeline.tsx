@@ -257,9 +257,9 @@ export function ScheduleTimeline({
                     className="absolute top-3 h-4 w-4 -translate-x-1/2 rotate-45 cursor-grab border-2 border-white shadow-sm active:cursor-grabbing"
                     style={{
                       left: dateToOffset(milestone.date) + dayWidth / 2,
-                      backgroundColor: MILESTONE_COLORS[milestone.type],
+                      backgroundColor: milestone.color,
                     }}
-                    title={`${milestone.label} — ${MILESTONE_TYPE_LABELS[milestone.type]}`}
+                    title={milestone.label}
                     onPointerDown={(e) => handleMilestoneDrag(milestone.id, e)}
                   />
                 ))}

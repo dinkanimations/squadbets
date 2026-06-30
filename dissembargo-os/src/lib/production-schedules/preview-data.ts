@@ -7,9 +7,10 @@ import {
   parseDate,
 } from "@/lib/production-schedules/calculations";
 import {
-  MILESTONE_COLORS,
-  type ScheduleFormDraft,
-} from "@/lib/production-schedules/constants";
+  resolveMilestoneColor,
+  sortMilestones,
+} from "@/lib/production-schedules/milestone-utils";
+import type { ScheduleFormDraft } from "@/lib/production-schedules/constants";
 import type { SchedulePdfData } from "@/lib/pdf/schedule/types";
 
 export type SchedulePreviewMeta = {
@@ -70,20 +71,24 @@ export function buildSchedulePreviewData(
     };
   });
 
-  const milestones = scheduleData.milestones.map((milestone) => ({
-    id: milestone.id,
-    type: milestone.type,
-    label: milestone.label,
-    date: milestone.date,
-    color:
-      milestone.color ??
-      scheduleData.milestoneLegend[milestone.type] ??
-      MILESTONE_COLORS[milestone.type],
-    leftPercent: toPercent(
-      daysFromStart(startDate, milestone.date),
-      totalDurationDays,
-    ),
-  }));
+  const milestones = sortMilestones(scheduleData.milestones)
+    .filter((milestone) => milestone.visibleInPdf !== false)
+    .map((milestone) => ({
+      id: milestone.id,
+      type: milestone.type,
+      label: milestone.label,
+      date: milestone.date,
+      color: resolveMilestoneColor(milestone, scheduleData.milestoneLegend),
+      leftPercent: toPercent(
+        daysFromStart(startDate, milestone.date),
+        totalDurationDays,
+      ),
+      shape: milestone.shape ?? "diamond",
+      icon: milestone.icon ?? null,
+      visibleInPdf: milestone.visibleInPdf !== false,
+      notes: milestone.notes,
+      sortOrder: milestone.sortOrder,
+    }));
 
   const deliverables = draft.deliverables.filter((item) => item.trim());
 

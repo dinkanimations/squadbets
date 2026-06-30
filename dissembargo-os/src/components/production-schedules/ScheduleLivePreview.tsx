@@ -2,6 +2,7 @@
 
 import type { SchedulePdfData } from "@/lib/pdf/schedule/types";
 import { formatScheduleDate } from "@/lib/production-schedules/calculations";
+import { MilestoneMarker } from "./MilestoneMarker";
 
 interface ScheduleLivePreviewProps {
   data: SchedulePdfData;
@@ -128,13 +129,18 @@ export function ScheduleLivePreview({ data }: ScheduleLivePreviewProps) {
                 {data.milestones.map((milestone) => (
                   <div
                     key={milestone.id}
-                    className="absolute top-1 h-3 w-3 -translate-x-1/2 rotate-45 border border-white shadow-sm"
-                    style={{
-                      left: `${milestone.leftPercent}%`,
-                      backgroundColor: milestone.color,
-                    }}
+                    className="absolute top-1 -translate-x-1/2"
+                    style={{ left: `${milestone.leftPercent}%` }}
                     title={milestone.label}
-                  />
+                  >
+                    <MilestoneMarker
+                      color={milestone.color}
+                      shape={milestone.shape}
+                      icon={milestone.icon}
+                      label={milestone.label}
+                      size="sm"
+                    />
+                  </div>
                 ))}
               </div>
 
@@ -144,9 +150,12 @@ export function ScheduleLivePreview({ data }: ScheduleLivePreviewProps) {
                     key={`legend-${milestone.id}`}
                     className="flex items-center gap-1 text-[7px] text-zinc-500"
                   >
-                    <span
-                      className="inline-block h-2 w-2 rotate-45"
-                      style={{ backgroundColor: milestone.color }}
+                    <MilestoneMarker
+                      color={milestone.color}
+                      shape={milestone.shape}
+                      icon={milestone.icon}
+                      label={milestone.label}
+                      size="sm"
                     />
                     {milestone.label}
                   </div>
