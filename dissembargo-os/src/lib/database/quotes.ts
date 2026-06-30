@@ -13,6 +13,7 @@ import type { QuotesFilter } from "@/lib/quotes/types";
 import {
   getPaginationRange,
   handleDatabaseError,
+  withDevDbFallback,
   type PaginationOptions,
 } from "./utils";
 
@@ -67,41 +68,43 @@ export async function getQuotesFiltered(
   filters: QuotesFilter = {},
   options?: PaginationOptions,
 ) {
-  const supabase = await createClient();
-  const { from, to } = getPaginationRange(options ?? { pageSize: 50 });
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
+    const { from, to } = getPaginationRange(options ?? { pageSize: 50 });
 
-  let query = supabase
-    .from("quotes")
-    .select(
-      `
+    let query = supabase
+      .from("quotes")
+      .select(
+        `
       *,
       company:companies (id, company_name, website, logo_url),
       contact:contacts (id, full_name),
       opportunity:opportunities (id, subject),
       project:projects (id, project_name)
     `,
-      { count: "exact" },
-    )
-    .eq("is_archived", filters.archived ?? false)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+        { count: "exact" },
+      )
+      .eq("is_archived", filters.archived ?? false)
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-  if (filters.status) {
-    query = query.eq("quote_status", filters.status);
-  }
+    if (filters.status) {
+      query = query.eq("quote_status", filters.status);
+    }
 
-  if (filters.search?.trim()) {
-    const term = `%${filters.search.trim()}%`;
-    query = query.or(
-      `quote_number.ilike.${term},project_title.ilike.${term},client_name.ilike.${term}`,
-    );
-  }
+    if (filters.search?.trim()) {
+      const term = `%${filters.search.trim()}%`;
+      query = query.or(
+        `quote_number.ilike.${term},project_title.ilike.${term},client_name.ilike.${term}`,
+      );
+    }
 
-  const { data, error, count } = await query;
+    const { data, error, count } = await query;
 
-  if (error) handleDatabaseError(error, "Failed to fetch quotes");
+    if (error) handleDatabaseError(error, "Failed to fetch quotes");
 
-  return { data: data as QuoteWithRelations[], count: count ?? 0 };
+    return { data: data as QuoteWithRelations[], count: count ?? 0 };
+  }, { data: [], count: 0 });
 }
 
 export async function getQuoteFullById(id: string): Promise<QuoteFull> {
@@ -164,31 +167,35 @@ export async function getQuoteFullById(id: string): Promise<QuoteFull> {
 }
 
 export async function countQuotesByStatus(status: QuoteStatus): Promise<number> {
-  const supabase = await createClient();
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
 
-  const { count, error } = await supabase
-    .from("quotes")
-    .select("id", { count: "exact", head: true })
-    .eq("quote_status", status)
-    .eq("is_archived", false);
+    const { count, error } = await supabase
+      .from("quotes")
+      .select("id", { count: "exact", head: true })
+      .eq("quote_status", status)
+      .eq("is_archived", false);
 
-  if (error) handleDatabaseError(error, `Failed to count ${status} quotes`);
+    if (error) handleDatabaseError(error, `Failed to count ${status} quotes`);
 
-  return count ?? 0;
+    return count ?? 0;
+  }, 0);
 }
 
 export async function getTotalQuoteValue(): Promise<number> {
-  const supabase = await createClient();
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("total")
-    .eq("is_archived", false)
-    .in("quote_status", ["draft", "sent", "approved"]);
+    const { data, error } = await supabase
+      .from("quotes")
+      .select("total")
+      .eq("is_archived", false)
+      .in("quote_status", ["draft", "sent", "approved"]);
 
-  if (error) handleDatabaseError(error, "Failed to calculate total quote value");
+    if (error) handleDatabaseError(error, "Failed to calculate total quote value");
 
-  return (data ?? []).reduce((sum, row) => sum + (row.total ?? 0), 0);
+    return (data ?? []).reduce((sum, row) => sum + (row.total ?? 0), 0);
+  }, 0);
 }
 
 export async function createQuoteRecord(input: QuoteInsert) {
@@ -320,17 +327,19 @@ export async function saveQuoteChildren(
 }
 
 export async function getQuotesByProjectId(projectId: string) {
-  const supabase = await createClient();
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("quotes")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    handleDatabaseError(error, `Failed to fetch quotes for project ${projectId}`);
-  }
+    if (error) {
+      handleDatabaseError(error, `Failed to fetch quotes for project ${projectId}`);
+    }
 
-  return data as Quote[];
+    return data as Quote[];
+  }, []);
 }

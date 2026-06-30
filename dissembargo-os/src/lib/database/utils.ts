@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { isAuthDisabled } from "@/lib/auth/dev-bypass";
 
 export type SupabaseServerClient = SupabaseClient<Database>;
 
@@ -22,6 +23,18 @@ export function handleDatabaseError(
   }
 
   throw new DatabaseError(`${context}: Unknown database error`);
+}
+
+export async function withDevDbFallback<T>(
+  operation: () => Promise<T>,
+  fallback: T,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (isAuthDisabled()) return fallback;
+    throw error;
+  }
 }
 
 export type PaginationOptions = {
