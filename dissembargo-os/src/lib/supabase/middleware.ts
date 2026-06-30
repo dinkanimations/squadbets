@@ -9,6 +9,18 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isAuthDisabled()) {
+    const isAuthRoute =
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/forgot-password") ||
+      pathname.startsWith("/reset-password");
+
+    if (isAuthRoute) {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      homeUrl.search = "";
+      return NextResponse.redirect(homeUrl);
+    }
+
     return supabaseResponse;
   }
   const isApiRoute = pathname.startsWith("/api/");

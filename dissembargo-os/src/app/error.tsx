@@ -21,9 +21,11 @@ export default function RootError({
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button onClick={reset}>Try again</Button>
-          <Link href="/login">
-            <Button variant="secondary">Sign in</Button>
-          </Link>
+          {process.env.NEXT_PUBLIC_DISABLE_AUTH !== "true" ? (
+            <Link href="/login">
+              <Button variant="secondary">Sign in</Button>
+            </Link>
+          ) : null}
         </div>
       </div>
     </div>

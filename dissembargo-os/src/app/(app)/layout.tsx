@@ -3,6 +3,7 @@ import { buildNavUser } from "@/lib/auth/profile";
 import { getDevNavUser, isAuthDisabled } from "@/lib/auth/dev-bypass";
 import { getProfile, getUser } from "@/lib/auth/session";
 import { getCachedAppSettings } from "@/lib/database/app-settings";
+import { STATIC_APP_SETTINGS } from "@/lib/settings/defaults";
 import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
@@ -10,9 +11,11 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const settings = await getCachedAppSettings();
-
   if (isAuthDisabled()) {
+    const settings = await getCachedAppSettings().catch(
+      () => STATIC_APP_SETTINGS,
+    );
+
     return (
       <AppShell
         companyName={settings.companyName}
@@ -23,6 +26,8 @@ export default async function DashboardLayout({
       </AppShell>
     );
   }
+
+  const settings = await getCachedAppSettings();
 
   const [{ user, error: userError }, { profile }] = await Promise.all([
     getUser(),

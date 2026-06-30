@@ -1,3 +1,4 @@
+import { isAuthDisabled } from "@/lib/auth/dev-bypass";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Company,
@@ -77,17 +78,22 @@ export async function getCompaniesFiltered(
 }
 
 export async function getAllCompanies() {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("companies")
-    .select("id, company_name")
-    .eq("status", "active")
-    .order("company_name", { ascending: true });
+    const { data, error } = await supabase
+      .from("companies")
+      .select("id, company_name")
+      .eq("status", "active")
+      .order("company_name", { ascending: true });
 
-  if (error) handleDatabaseError(error, "Failed to fetch companies");
+    if (error) handleDatabaseError(error, "Failed to fetch companies");
 
-  return data;
+    return data;
+  } catch (error) {
+    if (isAuthDisabled()) return [];
+    throw error;
+  }
 }
 
 export async function getCompanyById(id: string) {

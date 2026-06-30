@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { isAuthDisabled } from "@/lib/auth/dev-bypass";
 import { createClient } from "@/lib/supabase/server";
 import type { AppSettings, AppSettingsUpdate, MilestoneType } from "@/types/database";
 import { handleDatabaseError } from "./utils";
@@ -100,6 +101,16 @@ export async function getAppSettingsRow(): Promise<AppSettings | null> {
 }
 
 export async function getAppSettings(): Promise<AppSettingsData> {
+  if (isAuthDisabled()) {
+    try {
+      const row = await getAppSettingsRow();
+      if (row) return mapAppSettingsRow(row);
+    } catch {
+      // Supabase unreachable — use defaults for local UI testing.
+    }
+    return STATIC_APP_SETTINGS;
+  }
+
   const row = await getAppSettingsRow();
   if (!row) return STATIC_APP_SETTINGS;
   return mapAppSettingsRow(row);
