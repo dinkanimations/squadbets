@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
 import { getGmailAuthUrl, hasGoogleOAuthEnv } from "@/lib/gmail/client";
 import { GMAIL_OAUTH_STATE_COOKIE } from "@/lib/gmail/constants";
@@ -31,16 +32,6 @@ export async function GET() {
     path: "/",
   });
 
-  try {
-    redirect(getGmailAuthUrl(state));
-  } catch (connectError) {
-    const message =
-      connectError instanceof Error
-        ? connectError.message
-        : "gmail_connection_failed";
-
-    redirect(
-      `${INTEGRATIONS_URL}?gmail=error&message=${encodeURIComponent(message)}`,
-    );
-  }
+  const authUrl = getGmailAuthUrl(state);
+  return NextResponse.redirect(authUrl);
 }
