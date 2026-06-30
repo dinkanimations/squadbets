@@ -27,7 +27,9 @@ export default async function DashboardLayout({
     );
   }
 
-  const settings = await getCachedAppSettings();
+  const settings = await getCachedAppSettings().catch(
+    () => STATIC_APP_SETTINGS,
+  );
 
   const [{ user, error: userError }, { profile }] = await Promise.all([
     getUser(),

@@ -25,6 +25,19 @@ export function handleDatabaseError(
   throw new DatabaseError(`${context}: Unknown database error`);
 }
 
+export function isMissingSchemaError(
+  error: { message?: string; code?: string } | null,
+): boolean {
+  if (!error) return false;
+
+  return (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    (error.message?.includes("Could not find the table") ?? false) ||
+    (error.message?.includes("does not exist") ?? false)
+  );
+}
+
 export async function withDevDbFallback<T>(
   operation: () => Promise<T>,
   fallback: T,
