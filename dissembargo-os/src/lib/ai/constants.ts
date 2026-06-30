@@ -8,10 +8,19 @@ export const CRM_EMAIL_ROUTES = [
 export type CrmEmailRoute = (typeof CRM_EMAIL_ROUTES)[number];
 
 export const CRM_ROUTE_LABELS: Record<CrmEmailRoute, string> = {
-  potential_opportunity: "Potential Opportunity",
+  potential_opportunity: "Potential Client Opportunity",
   freelancer: "Freelancer",
   other: "Other",
 };
+
+/** Minimum confidence to auto-create Potential Opportunity or Freelancer records. */
+export const AUTO_CLASSIFY_MIN_CONFIDENCE = 80;
+
+export const POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE = AUTO_CLASSIFY_MIN_CONFIDENCE;
+export const FREELANCER_MIN_CONFIDENCE = AUTO_CLASSIFY_MIN_CONFIDENCE;
+
+export const OPENAI_MODEL = "gpt-4o-mini";
+export const PROMPT_VERSION = "v6";
 
 /** @deprecated Legacy categories kept for existing inbox rows and logs */
 export const AI_EMAIL_CATEGORIES = [
@@ -50,19 +59,12 @@ export const AI_CATEGORY_LABELS: Record<AiEmailCategory, string> = {
   other: "Other",
 };
 
-export const POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE = 50;
-export const FREELANCER_MIN_CONFIDENCE = 45;
-
-export const OPENAI_MODEL = "gpt-4o-mini";
-export const PROMPT_VERSION = "v5";
-
 export type AiClassificationResult = {
   route: CrmEmailRoute;
   confidence: number;
   summary: string;
   reasoning: string;
   signature: string | null;
-  /** Potential opportunity fields */
   company_name: string | null;
   contact_name: string | null;
   contact_email: string | null;
@@ -74,7 +76,6 @@ export type AiClassificationResult = {
   requested_deliverables: string | null;
   deadline: string | null;
   location: string | null;
-  /** Freelancer fields */
   freelancer_name: string | null;
   freelancer_email: string | null;
   role: string | null;
@@ -90,6 +91,7 @@ export type AiClassificationResult = {
 export type AiActionTaken =
   | "potential_opportunity"
   | "freelancer"
+  | "needs_review"
   | "ignored"
   | "classified_only"
   | "processing_failed";
@@ -100,6 +102,18 @@ export type AiFeedbackAction =
   | "reclassified"
   | "manual_created";
 
+export function isAutoClassifyConfidence(confidence: number): boolean {
+  return confidence >= AUTO_CLASSIFY_MIN_CONFIDENCE;
+}
+
+export function legacyCategoryToRoute(
+  category: AiEmailCategory | null | undefined,
+): CrmEmailRoute {
+  if (category === "new_business_opportunity") return "potential_opportunity";
+  if (category === "recruitment") return "freelancer";
+  return "other";
+}
+
 export const JOB_ENQUIRY_CATEGORY: AiEmailCategory = "new_business_opportunity";
 export const EXISTING_CLIENT_CATEGORY: AiEmailCategory = "existing_client";
 
@@ -107,7 +121,6 @@ export const IGNORED_EMAIL_CATEGORIES: AiEmailCategory[] = [
   "supplier",
   "invoice",
   "receipt",
-  "recruitment",
   "marketing",
   "newsletter",
   "spam",
@@ -180,12 +193,7 @@ export function classificationFromInboxFields(
   overrides: Partial<AiClassificationResult> = {},
 ): AiClassificationResult {
   const route: CrmEmailRoute =
-    overrides.route ??
-    (inbox.ai_category === "new_business_opportunity"
-      ? "potential_opportunity"
-      : inbox.ai_category === "recruitment"
-        ? "freelancer"
-        : "other");
+    overrides.route ?? legacyCategoryToRoute(inbox.ai_category);
 
   return {
     route,

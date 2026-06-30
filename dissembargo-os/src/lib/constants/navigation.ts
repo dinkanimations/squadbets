@@ -1,6 +1,7 @@
 import {
   Building2,
   Calendar,
+  ClipboardCheck,
   ClipboardList,
   FileText,
   LayoutDashboard,
@@ -23,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Companies", href: "/companies", icon: Building2 },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Freelancers", href: "/freelancers", icon: UserPlus },
+  { label: "Needs Review", href: "/review-queue", icon: ClipboardCheck },
   { label: "Quotes", href: "/quotes", icon: FileText },
   {
     label: "Production Schedules",

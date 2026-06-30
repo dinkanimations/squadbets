@@ -73,11 +73,6 @@ export async function createFreelancerFromInbox(
     throw new Error(`Failed to create freelancer profile: ${error.message}`);
   }
 
-  await supabase
-    .from("inbox")
-    .update({ review_status: "pending_review" })
-    .eq("id", inbox.id);
-
   await logPipelineEvent({
     userId: inbox.user_id,
     inboxId: inbox.id,

@@ -58,10 +58,8 @@ export function InboxPipelinePanel() {
 
         const parts = [
           `processed ${data.processed}`,
-          data.leadsFound > 0 ? `found ${data.leadsFound} leads` : null,
-          data.opportunitiesCreated > 0
-            ? `created ${data.opportunitiesCreated} opportunities`
-            : null,
+          data.leadsFound > 0 ? `auto-created ${data.leadsFound} records` : null,
+          data.needsReview > 0 ? `${data.needsReview} need review` : null,
           data.failed > 0 ? `${data.failed} failed` : null,
         ].filter(Boolean);
 
@@ -80,7 +78,7 @@ export function InboxPipelinePanel() {
     <Card className="mb-6">
       <CardHeader
         title="Pipeline status"
-        description="Gmail import → AI classification → Opportunities & Companies"
+        description="Gmail import → AI intent classification → Potential Opportunities & Freelancers"
       />
 
       {diagnostics ? (
@@ -88,11 +86,11 @@ export function InboxPipelinePanel() {
           <Stat label="Gmail imported" value={diagnostics.gmailImported} />
           <Stat label="Waiting for AI" value={waiting} highlight={waiting > 0} />
           <Stat label="Classified" value={diagnostics.classified} />
+          <Stat label="Needs review" value={diagnostics.needsReview} highlight={diagnostics.needsReview > 0} />
           <Stat label="Ignored (noise)" value={diagnostics.ignored} />
-          <Stat label="Inbox leads" value={diagnostics.stagedLeads} />
-          <Stat label="Opportunities" value={diagnostics.opportunitiesCreated} />
-          <Stat label="Companies" value={diagnostics.companiesCreated} />
-          <Stat label="Clients" value={diagnostics.clientsCreated} />
+          <Stat label="Potential opportunities" value={diagnostics.stagedLeads} />
+          <Stat label="Freelancers" value={diagnostics.freelancersCreated} />
+          <Stat label="AI failures" value={diagnostics.failed} highlight={diagnostics.failed > 0} />
         </div>
       ) : (
         <p className="text-sm text-muted">

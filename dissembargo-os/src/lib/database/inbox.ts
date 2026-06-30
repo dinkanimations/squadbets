@@ -56,25 +56,48 @@ export async function getInboxEmails(options?: InboxListOptions) {
   }, { data: [] as InboxEmail[], count: 0 });
 }
 
-export async function getReviewQueueEmails(options?: PaginationOptions) {
+export async function getNeedsReviewEmails(options?: PaginationOptions) {
   return withDevDbFallback(async () => {
     const supabase = await createClient();
+
+    const [
+      { data: emails, error },
+      { data: potentials },
+      { data: freelancers },
+    ] = await Promise.all([
+      supabase
+        .from("inbox")
+        .select("*")
+        .eq("review_status", "pending_review")
+        .order("ai_processed_at", { ascending: false }),
+      supabase.from("potential_opportunities").select("inbox_id"),
+      supabase.from("freelancers").select("inbox_id"),
+    ]);
+
+    if (error) handleDatabaseError(error, "Failed to fetch needs review queue");
+
+    const stagedIds = new Set([
+      ...(potentials ?? []).map((row) => row.inbox_id),
+      ...(freelancers ?? []).map((row) => row.inbox_id),
+    ]);
+
+    const needsReview = (emails ?? []).filter((email) => !stagedIds.has(email.id));
+
     const { from, to } = getPaginationRange({
       page: options?.page,
       pageSize: options?.pageSize ?? 50,
     });
 
-    const { data, error, count } = await supabase
-      .from("inbox")
-      .select("*", { count: "exact" })
-      .eq("review_status", "pending_review")
-      .order("ai_processed_at", { ascending: false })
-      .range(from, to);
-
-    if (error) handleDatabaseError(error, "Failed to fetch review queue");
-
-    return { data: data as InboxEmail[], count: count ?? 0 };
+    return {
+      data: needsReview.slice(from, to + 1) as InboxEmail[],
+      count: needsReview.length,
+    };
   }, { data: [] as InboxEmail[], count: 0 });
+}
+
+/** @deprecated Use getNeedsReviewEmails */
+export async function getReviewQueueEmails(options?: PaginationOptions) {
+  return getNeedsReviewEmails(options);
 }
 
 export async function getInboxEmailById(id: string) {
@@ -91,6 +114,11 @@ export async function getInboxEmailById(id: string) {
 
     return data as InboxEmail;
   }, null as unknown as InboxEmail);
+}
+
+export async function countNeedsReviewEmails() {
+  const { count } = await getNeedsReviewEmails();
+  return count;
 }
 
 export async function countInboxEmails(options?: {

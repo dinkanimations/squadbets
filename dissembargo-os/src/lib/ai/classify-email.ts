@@ -1,5 +1,6 @@
 import {
   CRM_EMAIL_ROUTES,
+  CRM_ROUTE_LABELS,
   OPENAI_MODEL,
   PROMPT_VERSION,
   type AiClassificationResult,
@@ -10,6 +11,7 @@ import {
   extractEmailSignature,
   getEmailBodyForAnalysis,
 } from "./extract-signature";
+import type { InboxAttachment } from "@/types/database";
 
 interface ClassifyEmailInput {
   subject: string | null;
@@ -18,30 +20,51 @@ interface ClassifyEmailInput {
   bodyPlain: string | null;
   bodyHtml: string | null;
   threadContext?: string | null;
+  attachments?: InboxAttachment[] | null;
+}
+
+function formatAttachments(attachments: InboxAttachment[] | null | undefined) {
+  if (!attachments?.length) return "None";
+
+  return attachments
+    .map(
+      (file) =>
+        `- ${file.filename} (${file.mimeType || "unknown type"}, ${file.size ?? 0} bytes)`,
+    )
+    .join("\n");
 }
 
 function buildPrompt(input: ClassifyEmailInput, signature: string | null) {
   const body = getEmailBodyForAnalysis(input.bodyPlain, input.bodyHtml);
 
-  return `You are the CRM AI for Dissembargo, a creative production agency (animation, CGI, rendering, medical visualisation).
+  return `You are an experienced business development manager for Dissembargo, a creative production agency (animation, CGI, rendering, medical visualisation).
 
-Classify each email into EXACTLY ONE route:
-- potential_opportunity: A genuine NEW business enquiry — someone asking for a quote, pricing, proposal, or creative/production work.
-- freelancer: Someone offering their services, pitching freelance work, sending a portfolio, showreel, CV, or availability — NOT a client enquiry.
-- other: Everything else — newsletters, invoices, receipts, marketing, spam, calendar invites, social notifications, internal mail, automated messages, existing client project updates, recruitment from agencies, etc.
+Your job is to understand WHY the sender is contacting us — read the entire email and infer their intent. Do NOT classify based on keywords alone (e.g. seeing "animation", "portfolio", or "quote" is not enough).
+
+Classify into EXACTLY ONE route:
+
+1. potential_opportunity — The sender wants to HIRE Dissembargo or buy our services.
+   They are requesting a quote, discussing a project, commissioning creative work, exploring a partnership, or asking us to produce something for them.
+   Example reasoning: "Company wants us to produce a launch film and is requesting a quotation."
+
+2. freelancer — The sender wants to BE HIRED by us or is offering their own services.
+   They are sending a CV, portfolio, showreel, availability, day rate, or pitching themselves as a freelancer/contractor.
+   Example reasoning: "Individual is introducing themselves as a freelance motion designer and attaching a portfolio."
+
+3. other — Everything else: newsletters, marketing, invoices, receipts, spam, automated notifications, calendar invites, social alerts, internal mail, unrelated correspondence.
+   Example reasoning: "Marketing newsletter with no request for services."
 
 Return JSON with these exact keys:
 - route: one of ${CRM_EMAIL_ROUTES.map((r) => `"${r}"`).join(", ")}
-- confidence: number 0-100
-- summary: one actionable sentence for a producer
-- reasoning: brief explanation
+- confidence: number 0-100 — how certain you are about the intent (not keyword matches)
+- summary: one short sentence a producer can act on
+- reasoning: 1-2 sentences explaining WHY you chose this route based on sender intent
 
-Potential opportunity fields (when route is potential_opportunity, else null):
-- company_name, contact_name, contact_email, contact_phone, website
-- project_name, project_description, estimated_budget, requested_deliverables, deadline, location
+Potential opportunity fields (populate when route is potential_opportunity, else null):
+company_name, contact_name, contact_email, contact_phone, website, project_name, project_description, estimated_budget, requested_deliverables, deadline, location
 
-Freelancer fields (when route is freelancer, else null):
-- freelancer_name, freelancer_email, role, skills, software, portfolio_url, website, linkedin_url, day_rate, availability, notes
+Freelancer fields (populate when route is freelancer, else null):
+freelancer_name, freelancer_email, role, skills, software, portfolio_url, website, linkedin_url, day_rate, availability, notes
 
 Shared:
 - signature: extracted email signature text, or null
@@ -50,6 +73,9 @@ Subject: ${input.subject ?? "(no subject)"}
 Sender Name: ${input.senderName ?? "(unknown)"}
 Sender Email: ${input.senderEmail ?? "(unknown)"}
 Detected Signature: ${signature ?? "(none detected)"}
+
+Attachments:
+${formatAttachments(input.attachments)}
 
 Email Body:
 ${body || "(empty body)"}
@@ -105,8 +131,7 @@ export async function classifyEmail(
     messages: [
       {
         role: "system",
-        content:
-          "You classify emails for a creative agency CRM. Respond only with valid JSON. Never route freelancer pitches as potential opportunities.",
+        content: `You classify emails by sender intent for a creative agency CRM. Respond only with valid JSON. Labels: ${Object.entries(CRM_ROUTE_LABELS).map(([k, v]) => `${k}=${v}`).join(", ")}. Never confuse someone offering their services (freelancer) with someone trying to hire the agency (potential_opportunity).`,
       },
       {
         role: "user",

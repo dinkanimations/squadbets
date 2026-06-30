@@ -1,8 +1,9 @@
-import { Building2, Mail, Sparkles, Target } from "lucide-react";
+import { Building2, ClipboardCheck, Mail, Sparkles, Target } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { countOpportunities } from "@/lib/database/opportunities";
 import {
   countInboxEmails,
+  countNeedsReviewEmails,
   countOpportunitiesCreatedToday,
 } from "@/lib/database/inbox";
 import { countPendingPotentialOpportunities } from "@/lib/database/potential-opportunities";
@@ -14,7 +15,8 @@ import { ProjectStats } from "@/components/dashboard/ProjectStats";
 export async function DashboardStats() {
   let newOpportunitiesCount = 0;
   let newEmailsCount = 0;
-  let reviewQueueCount = 0;
+  let needsReviewCount = 0;
+  let potentialOpportunitiesCount = 0;
   let opportunitiesTodayCount = 0;
   let newCompaniesCount = 0;
   let opportunitiesError = false;
@@ -41,9 +43,15 @@ export async function DashboardStats() {
   }
 
   try {
-    reviewQueueCount = await countPendingPotentialOpportunities();
+    needsReviewCount = await countNeedsReviewEmails();
   } catch {
     reviewError = true;
+  }
+
+  try {
+    potentialOpportunitiesCount = await countPendingPotentialOpportunities();
+  } catch {
+    // reuse reviewError only for needs review; potential opps failure is silent
   }
 
   try {
@@ -83,14 +91,21 @@ export async function DashboardStats() {
         icon={Mail}
       />
       <StatCard
-        title="Potential Opportunities"
-        value={reviewError ? "—" : String(reviewQueueCount)}
+        title="Needs Review"
+        value={reviewError ? "—" : String(needsReviewCount)}
         change={
           reviewError
             ? "Unable to load from database"
-            : "Awaiting your review in Inbox"
+            : "Low-confidence AI classifications"
         }
-        changeType={reviewError ? "negative" : "neutral"}
+        changeType={reviewError ? "negative" : needsReviewCount > 0 ? "negative" : "neutral"}
+        icon={ClipboardCheck}
+      />
+      <StatCard
+        title="Potential Opportunities"
+        value={String(potentialOpportunitiesCount)}
+        change="Staged leads awaiting conversion"
+        changeType="neutral"
         icon={Target}
       />
       <StatCard

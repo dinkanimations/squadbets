@@ -59,7 +59,6 @@ export async function createPotentialOpportunityFromInbox(
     .update({
       detected_company_name: companyName,
       detected_website: classification.website || inbox.detected_website,
-      review_status: "pending_review",
     })
     .eq("id", inbox.id);
 

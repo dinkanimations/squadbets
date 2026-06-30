@@ -12,8 +12,8 @@ export default function ReviewQueueError({
 }) {
   return (
     <RouteError
-      title="Review Queue"
-      description="Something went wrong while loading the review queue."
+      title="Needs Review"
+      description="Something went wrong while loading the needs review queue."
       error={error}
       reset={reset}
       icon={ClipboardCheck}

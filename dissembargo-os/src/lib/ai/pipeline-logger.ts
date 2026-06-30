@@ -12,6 +12,7 @@ export const PIPELINE_STAGES = [
   "opportunity_created",
   "company_linked",
   "client_created",
+  "needs_review",
   "ignored",
   "failed",
 ] as const;

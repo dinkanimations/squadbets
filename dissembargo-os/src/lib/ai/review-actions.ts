@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getInboxEmailById } from "@/lib/database/inbox";
 import { createOpportunityFromInbox } from "@/lib/ai/create-opportunity-from-inbox";
+import { createPotentialOpportunityFromInbox } from "@/lib/ai/create-potential-opportunity";
+import { createFreelancerFromInbox } from "@/lib/ai/create-freelancer-from-inbox";
 import {
   updateInboxAiCategory,
   reprocessInboxEmail,
@@ -15,8 +17,11 @@ import {
 import type { AiEmailCategory } from "@/lib/ai/constants";
 import {
   AI_CATEGORY_LABELS,
+  CRM_ROUTE_LABELS,
   classificationFromInboxFields,
   isJobEnquiryCategory,
+  routeToLegacyCategory,
+  type CrmEmailRoute,
 } from "@/lib/ai/constants";
 import { getUser } from "@/lib/auth/session";
 
@@ -290,4 +295,93 @@ export async function approveIfJobEnquiry(
   category: AiEmailCategory,
 ): Promise<boolean> {
   return isJobEnquiryCategory(category);
+}
+
+export async function approveNeedsReviewAction(
+  inboxId: string,
+  route: CrmEmailRoute,
+): Promise<ReviewActionState> {
+  try {
+    const inbox = await getInboxEmailById(inboxId);
+
+    if (inbox.review_status !== "pending_review") {
+      return { error: "This email is no longer pending review." };
+    }
+
+    const classification = classificationFromInboxFields(inbox, { route });
+    const userId = await getCurrentUserId();
+    const supabase = await createServiceClient();
+    const legacyCategory = routeToLegacyCategory(route);
+
+    let actionTaken: "potential_opportunity" | "freelancer" | "ignored" =
+      "ignored";
+    let recordCreated = false;
+    let reviewStatus: "approved" | "ignored" = "ignored";
+
+    if (route === "potential_opportunity") {
+      await createPotentialOpportunityFromInbox(inbox, classification);
+      actionTaken = "potential_opportunity";
+      recordCreated = true;
+      reviewStatus = "approved";
+    } else if (route === "freelancer") {
+      await createFreelancerFromInbox(inbox, classification);
+      actionTaken = "freelancer";
+      recordCreated = true;
+      reviewStatus = "approved";
+    }
+
+    await supabase
+      .from("inbox")
+      .update({
+        review_status: reviewStatus,
+        ai_category: legacyCategory,
+      })
+      .eq("id", inboxId);
+
+    await logAiClassification({
+      inboxId,
+      userId: inbox.user_id,
+      aiCategory: legacyCategory,
+      aiConfidence: inbox.ai_confidence,
+      aiSummary: inbox.ai_summary,
+      aiReasoning: `Manually approved from needs review as ${CRM_ROUTE_LABELS[route]}`,
+      rawResponse: {
+        manual_approval: true,
+        route,
+        classification: CRM_ROUTE_LABELS[route],
+        record_created: recordCreated,
+      },
+      actionTaken,
+    });
+
+    await logAiClassificationFeedback({
+      inboxId,
+      userId: userId ?? inbox.user_id,
+      originalCategory: inbox.ai_category,
+      correctedCategory: legacyCategory,
+      originalConfidence: inbox.ai_confidence,
+      feedbackAction: "approved",
+    });
+
+    revalidatePath("/review-queue");
+    revalidatePath("/potential-opportunities");
+    revalidatePath("/freelancers");
+    revalidatePath("/inbox");
+    revalidatePath("/");
+
+    const successMessages: Record<CrmEmailRoute, string> = {
+      potential_opportunity: "Potential Opportunity created.",
+      freelancer: "Freelancer profile created.",
+      other: "Email classified as Other and removed from review queue.",
+    };
+
+    return { success: successMessages[route] };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to approve email from needs review.",
+    };
+  }
 }

@@ -8,8 +8,10 @@ export type PipelineDiagnostics = {
   processing: number;
   classified: number;
   ignored: number;
+  needsReview: number;
   failed: number;
   stagedLeads: number;
+  freelancersCreated: number;
   acceptedLeads: number;
   opportunitiesCreated: number;
   companiesCreated: number;
@@ -39,7 +41,9 @@ export async function getPipelineDiagnostics(
     { count: processing },
     { count: classified },
     { count: ignored },
+    { count: needsReview },
     { count: stagedLeads },
+    { count: freelancersCreated },
     { count: acceptedLeads },
     { count: opportunitiesCreated },
     { count: companiesCreated },
@@ -80,9 +84,18 @@ export async function getPipelineDiagnostics(
     ),
     withUser(
       supabase
+        .from("inbox")
+        .select("id", { count: "exact", head: true })
+        .eq("review_status", "pending_review"),
+    ),
+    withUser(
+      supabase
         .from("potential_opportunities")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending"),
+    ),
+    withUser(
+      supabase.from("freelancers").select("id", { count: "exact", head: true }),
     ),
     withUser(
       supabase
@@ -127,8 +140,10 @@ export async function getPipelineDiagnostics(
     processing: processing ?? 0,
     classified: classified ?? 0,
     ignored: ignored ?? 0,
+    needsReview: needsReview ?? 0,
     failed: failed ?? 0,
     stagedLeads: stagedLeads ?? 0,
+    freelancersCreated: freelancersCreated ?? 0,
     acceptedLeads: acceptedLeads ?? 0,
     opportunitiesCreated: opportunitiesCreated ?? 0,
     companiesCreated: companiesCreated ?? 0,

@@ -1,11 +1,12 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import type { InboxEmail } from "@/types/database";
+import type { InboxEmail, InboxAttachment } from "@/types/database";
 import { classifyEmail } from "./classify-email";
 import { createPotentialOpportunityFromInbox } from "./create-potential-opportunity";
 import { createFreelancerFromInbox } from "./create-freelancer-from-inbox";
 import {
-  FREELANCER_MIN_CONFIDENCE,
-  POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE,
+  AUTO_CLASSIFY_MIN_CONFIDENCE,
+  CRM_ROUTE_LABELS,
+  isAutoClassifyConfidence,
   routeToLegacyCategory,
   type AiActionTaken,
   type AiEmailCategory,
@@ -96,6 +97,8 @@ export async function processInboxEmail(
   try {
     const threadContext = await getThreadContextForInbox(inbox);
 
+    const attachments = (inbox.attachments as InboxAttachment[] | null) ?? [];
+
     const { result, rawResponse } = await classifyEmail({
       subject: inbox.subject,
       senderName: inbox.sender_name,
@@ -103,17 +106,25 @@ export async function processInboxEmail(
       bodyPlain: inbox.body_plain,
       bodyHtml: inbox.body_html,
       threadContext,
+      attachments,
     });
+
+    const autoCreate = isAutoClassifyConfidence(result.confidence);
+    let recordCreated = false;
 
     await logPipelineEvent({
       userId: inbox.user_id,
       inboxId,
       stage: "ai_classified",
-      message: `${result.route} (${result.confidence}%)`,
+      message: `${CRM_ROUTE_LABELS[result.route]} (${result.confidence}%) — ${result.reasoning}`,
       metadata: {
         route: result.route,
+        classification: CRM_ROUTE_LABELS[result.route],
         confidence: result.confidence,
+        reasoning: result.reasoning,
         summary: result.summary,
+        autoCreate,
+        threshold: AUTO_CLASSIFY_MIN_CONFIDENCE,
       },
     });
 
@@ -126,33 +137,69 @@ export async function processInboxEmail(
       | "ignored"
       | null = "ignored";
 
-    const isPotentialOpportunity =
-      result.route === "potential_opportunity" &&
-      result.confidence >= POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE;
+    const isPotentialOpportunity = result.route === "potential_opportunity";
+    const isFreelancer = result.route === "freelancer";
 
-    const isFreelancer =
-      result.route === "freelancer" &&
-      result.confidence >= FREELANCER_MIN_CONFIDENCE;
-
-    if (isPotentialOpportunity) {
+    if (isPotentialOpportunity && autoCreate) {
       await createPotentialOpportunityFromInbox(inbox, result);
       actionTaken = "potential_opportunity";
-      reviewStatus = "pending_review";
-    } else if (isFreelancer) {
+      recordCreated = true;
+      reviewStatus = null;
+
+      await logPipelineEvent({
+        userId: inbox.user_id,
+        inboxId,
+        stage: "potential_opportunity_created",
+        message: `Potential Opportunity created — ${result.summary}`,
+        metadata: { confidence: result.confidence, reasoning: result.reasoning },
+      });
+    } else if (isFreelancer && autoCreate) {
       await createFreelancerFromInbox(inbox, result);
       actionTaken = "freelancer";
+      recordCreated = true;
+      reviewStatus = null;
+
+      await logPipelineEvent({
+        userId: inbox.user_id,
+        inboxId,
+        stage: "freelancer_created",
+        message: `Freelancer profile created — ${result.summary}`,
+        metadata: { confidence: result.confidence, reasoning: result.reasoning },
+      });
+    } else if (isPotentialOpportunity || isFreelancer) {
+      actionTaken = "needs_review";
       reviewStatus = "pending_review";
+
+      await logPipelineEvent({
+        userId: inbox.user_id,
+        inboxId,
+        stage: "needs_review",
+        status: "skipped",
+        message: `Needs review (${result.confidence}% < ${AUTO_CLASSIFY_MIN_CONFIDENCE}%): ${result.reasoning}`,
+        metadata: {
+          route: result.route,
+          classification: CRM_ROUTE_LABELS[result.route],
+          confidence: result.confidence,
+          reasoning: result.reasoning,
+          recordCreated: false,
+        },
+      });
     } else {
       reviewStatus = "ignored";
-      actionTaken = result.route === "other" ? "ignored" : "classified_only";
+      actionTaken = "ignored";
 
       await logPipelineEvent({
         userId: inbox.user_id,
         inboxId,
         stage: "ignored",
         status: "skipped",
-        message: `Other: ${result.route}`,
-        metadata: { route: result.route, confidence: result.confidence },
+        message: `Other — ${result.reasoning}`,
+        metadata: {
+          route: result.route,
+          confidence: result.confidence,
+          reasoning: result.reasoning,
+          recordCreated: false,
+        },
       });
     }
 
@@ -182,9 +229,19 @@ export async function processInboxEmail(
       aiConfidence: result.confidence,
       aiSummary: result.summary,
       aiReasoning: result.reasoning,
-      rawResponse,
+      rawResponse: {
+        ...rawResponse,
+        route: result.route,
+        classification: CRM_ROUTE_LABELS[result.route],
+        record_created: recordCreated,
+        needs_review: actionTaken === "needs_review",
+      },
       actionTaken,
     });
+
+    console.info(
+      `[ai-classification] inbox=${inboxId} route=${result.route} confidence=${result.confidence}% record_created=${recordCreated} reasoning="${result.reasoning}"`,
+    );
 
     return { inboxId, status: "completed", actionTaken };
   } catch (error) {
@@ -377,6 +434,7 @@ export async function reprocessInboxEmail(inboxId: string) {
   const supabase = await createServiceClient();
 
   await supabase.from("potential_opportunities").delete().eq("inbox_id", inboxId);
+  await supabase.from("freelancers").delete().eq("inbox_id", inboxId);
 
   await supabase
     .from("inbox")

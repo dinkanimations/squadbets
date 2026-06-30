@@ -11,6 +11,7 @@ export type ReprocessImportedEmailsResult = {
   reset: number;
   processed: number;
   leadsFound: number;
+  needsReview: number;
   opportunitiesCreated: number;
   failed: number;
   results: ProcessInboxResult[];
@@ -58,6 +59,7 @@ export async function reprocessImportedEmails(options?: {
   let reset = stuckReset;
   const results: ProcessInboxResult[] = [];
   let leadsFound = 0;
+  let needsReview = 0;
   let opportunitiesCreated = 0;
   let failed = 0;
 
@@ -98,6 +100,9 @@ export async function reprocessImportedEmails(options?: {
         leadsFound: (n) => {
           leadsFound += n;
         },
+        needsReview: (n) => {
+          needsReview += n;
+        },
         opportunitiesCreated: (n) => {
           opportunitiesCreated += n;
         },
@@ -129,6 +134,9 @@ export async function reprocessImportedEmails(options?: {
         leadsFound: (n) => {
           leadsFound += n;
         },
+        needsReview: (n) => {
+          needsReview += n;
+        },
         opportunitiesCreated: (n) => {
           opportunitiesCreated += n;
         },
@@ -143,6 +151,7 @@ export async function reprocessImportedEmails(options?: {
     reset,
     processed: results.length,
     leadsFound,
+    needsReview,
     opportunitiesCreated,
     failed,
     results,
@@ -153,6 +162,7 @@ function tallyResult(
   result: ProcessInboxResult,
   counters: {
     leadsFound: (n: number) => void;
+    needsReview: (n: number) => void;
     opportunitiesCreated: (n: number) => void;
     failed: (n: number) => void;
   },
@@ -167,5 +177,10 @@ function tallyResult(
     result.actionTaken === "freelancer"
   ) {
     counters.leadsFound(1);
+    return;
+  }
+
+  if (result.actionTaken === "needs_review") {
+    counters.needsReview(1);
   }
 }
