@@ -46,6 +46,14 @@ export async function withDevDbFallback<T>(
     return await operation();
   } catch (error) {
     if (isAuthDisabled()) return fallback;
+
+    if (
+      error instanceof DatabaseError &&
+      isMissingSchemaError({ message: error.message, code: error.code })
+    ) {
+      return fallback;
+    }
+
     throw error;
   }
 }

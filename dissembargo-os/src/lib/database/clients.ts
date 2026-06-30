@@ -8,12 +8,14 @@ import type {
 import {
   getPaginationRange,
   handleDatabaseError,
+  withDevDbFallback,
   type PaginationOptions,
 } from "./utils";
 
 export async function getClients(
   options?: PaginationOptions & { status?: ClientStatus },
 ) {
+  return withDevDbFallback(async () => {
   const supabase = await createClient();
   const { from, to } = getPaginationRange(options ?? {});
 
@@ -38,6 +40,7 @@ export async function getClients(
   if (error) handleDatabaseError(error, "Failed to fetch clients");
 
   return { data, count: count ?? 0 };
+  }, { data: [], count: 0 });
 }
 
 export async function getClientById(id: string) {

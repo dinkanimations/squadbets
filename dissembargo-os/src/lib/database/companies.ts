@@ -1,4 +1,3 @@
-import { isAuthDisabled } from "@/lib/auth/dev-bypass";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Company,
@@ -9,6 +8,7 @@ import type {
 import {
   getPaginationRange,
   handleDatabaseError,
+  withDevDbFallback,
   type PaginationOptions,
 } from "./utils";
 
@@ -21,6 +21,7 @@ export type CompaniesFilter = {
 };
 
 export async function getCompanies(options?: PaginationOptions) {
+  return withDevDbFallback(async () => {
   const supabase = await createClient();
   const { from, to } = getPaginationRange(options ?? {});
 
@@ -34,12 +35,14 @@ export async function getCompanies(options?: PaginationOptions) {
   if (error) handleDatabaseError(error, "Failed to fetch companies");
 
   return { data: data as Company[], count: count ?? 0 };
+  }, { data: [], count: 0 });
 }
 
 export async function getCompaniesFiltered(
   filters: CompaniesFilter = {},
   options?: PaginationOptions,
 ) {
+  return withDevDbFallback(async () => {
   const supabase = await createClient();
   const { from, to } = getPaginationRange(options ?? { pageSize: 50 });
 
@@ -75,10 +78,11 @@ export async function getCompaniesFiltered(
   if (error) handleDatabaseError(error, "Failed to fetch companies");
 
   return { data: data as Company[], count: count ?? 0 };
+  }, { data: [], count: 0 });
 }
 
 export async function getAllCompanies() {
-  try {
+  return withDevDbFallback(async () => {
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -90,10 +94,7 @@ export async function getAllCompanies() {
     if (error) handleDatabaseError(error, "Failed to fetch companies");
 
     return data;
-  } catch (error) {
-    if (isAuthDisabled()) return [];
-    throw error;
-  }
+  }, []);
 }
 
 export async function getCompanyById(id: string) {
