@@ -6,12 +6,19 @@ import {
   refreshAccessToken,
 } from "./client";
 import { parseGmailMessage } from "./parse";
-import { INITIAL_SYNC_MAX_MESSAGES } from "./constants";
-import { processInboxEmail } from "@/lib/ai/process-inbox";
+import { INITIAL_SYNC_MAX_MESSAGES, HISTORICAL_IMPORT_BATCH_SIZE, BACKFILL_BATCH_SIZE } from "./constants";
+import {
+  processInboxEmail,
+  processPendingInboxEmails,
+  backfillPotentialOpportunities,
+} from "@/lib/ai/process-inbox";
 
 export type SyncResult = {
   imported: number;
   skipped: number;
+  historicalImported: number;
+  backfillProcessed: number;
+  potentialOpportunitiesFound: number;
   status: "success" | "error";
   error?: string;
   gmailAddress?: string;
@@ -107,12 +114,13 @@ async function importMessage(
 async function listInboxMessageIds(
   connection: GmailConnection,
   maxMessages = INITIAL_SYNC_MAX_MESSAGES,
-): Promise<string[]> {
+  startPageToken?: string | null,
+): Promise<{ messageIds: string[]; nextPageToken: string | null }> {
   const { accessToken, refreshToken } = await getValidAccessToken(connection);
   const gmail = createGmailClient(accessToken, refreshToken);
 
   const messageIds: string[] = [];
-  let pageToken: string | undefined;
+  let pageToken: string | undefined = startPageToken ?? undefined;
 
   do {
     const response = await gmail.users.messages.list({
@@ -127,7 +135,10 @@ async function listInboxMessageIds(
     pageToken = response.data.nextPageToken ?? undefined;
   } while (pageToken && messageIds.length < maxMessages);
 
-  return messageIds.slice(0, maxMessages);
+  return {
+    messageIds: messageIds.slice(0, maxMessages),
+    nextPageToken: pageToken ?? null,
+  };
 }
 
 async function syncViaHistory(
@@ -138,7 +149,7 @@ async function syncViaHistory(
 
   if (!connection.history_id) {
     const profile = await getGmailProfile(accessToken, refreshToken);
-    const messageIds = await listInboxMessageIds(connection);
+    const { messageIds } = await listInboxMessageIds(connection);
     return {
       messageIds,
       newHistoryId: profile.historyId ?? null,
@@ -177,7 +188,7 @@ async function syncViaHistory(
         : null;
 
     if (status === 404) {
-      const messageIds = await listInboxMessageIds(connection);
+      const { messageIds } = await listInboxMessageIds(connection);
       const profile = await getGmailProfile(accessToken, refreshToken);
       return { messageIds, newHistoryId: profile.historyId ?? null };
     }
@@ -188,12 +199,74 @@ async function syncViaHistory(
   return { messageIds: Array.from(messageIds), newHistoryId };
 }
 
+async function importMissingHistoricalMessages(
+  connection: GmailConnection,
+  maxMessages = HISTORICAL_IMPORT_BATCH_SIZE,
+): Promise<{ imported: number; skipped: number }> {
+  const supabase = await createServiceClient();
+  const { messageIds, nextPageToken } = await listInboxMessageIds(
+    connection,
+    maxMessages,
+    connection.historical_import_page_token,
+  );
+  let imported = 0;
+  let skipped = 0;
+
+  for (const messageId of messageIds) {
+    const result = await importMessage(
+      connection.user_id,
+      connection,
+      messageId,
+    );
+
+    if (result.status === "imported") {
+      imported += 1;
+
+      try {
+        await processInboxEmail(result.inboxId);
+      } catch (processError) {
+        console.error(
+          `AI processing failed for historical inbox ${result.inboxId}:`,
+          processError,
+        );
+      }
+    } else {
+      skipped += 1;
+    }
+  }
+
+  await supabase
+    .from("gmail_connections")
+    .update({ historical_import_page_token: nextPageToken })
+    .eq("id", connection.id);
+
+  return { imported, skipped };
+}
+
+async function runInboxIntelligencePipeline(userId: string) {
+  await processPendingInboxEmails(BACKFILL_BATCH_SIZE);
+
+  const backfill = await backfillPotentialOpportunities({
+    userId,
+    limit: BACKFILL_BATCH_SIZE,
+  });
+
+  return {
+    backfillProcessed: backfill.processed,
+    potentialOpportunitiesFound: backfill.potentialOpportunities,
+  };
+}
+
 export async function syncGmailConnection(
   connection: GmailConnection,
+  options?: { skipIntelligencePipeline?: boolean },
 ): Promise<SyncResult> {
   const supabase = await createServiceClient();
   let imported = 0;
   let skipped = 0;
+  let historicalImported = 0;
+  let backfillProcessed = 0;
+  let potentialOpportunitiesFound = 0;
 
   try {
     await supabase
@@ -226,6 +299,16 @@ export async function syncGmailConnection(
       }
     }
 
+    const historical = await importMissingHistoricalMessages(connection);
+    historicalImported = historical.imported;
+    skipped += historical.skipped;
+
+    if (!options?.skipIntelligencePipeline) {
+      const pipeline = await runInboxIntelligencePipeline(connection.user_id);
+      backfillProcessed = pipeline.backfillProcessed;
+      potentialOpportunitiesFound = pipeline.potentialOpportunitiesFound;
+    }
+
     await supabase
       .from("gmail_connections")
       .update({
@@ -239,6 +322,9 @@ export async function syncGmailConnection(
     return {
       imported,
       skipped,
+      historicalImported,
+      backfillProcessed,
+      potentialOpportunitiesFound,
       status: "success",
       gmailAddress: connection.gmail_address,
     };
@@ -258,6 +344,9 @@ export async function syncGmailConnection(
     return {
       imported,
       skipped,
+      historicalImported,
+      backfillProcessed,
+      potentialOpportunitiesFound,
       status: "error",
       error: message,
       gmailAddress: connection.gmail_address,
@@ -271,10 +360,22 @@ export async function syncUserGmailConnections(userId: string) {
   );
 
   const connections = await getUserGmailConnectionsForSync(userId);
-  const results = [];
+  const results: SyncResult[] = [];
 
   for (const connection of connections) {
-    results.push(await syncGmailConnection(connection));
+    results.push(
+      await syncGmailConnection(connection, { skipIntelligencePipeline: true }),
+    );
+  }
+
+  if (connections.length > 0) {
+    const pipeline = await runInboxIntelligencePipeline(userId);
+
+    const last = results[results.length - 1];
+    if (last) {
+      last.backfillProcessed = pipeline.backfillProcessed;
+      last.potentialOpportunitiesFound = pipeline.potentialOpportunitiesFound;
+    }
   }
 
   return results;

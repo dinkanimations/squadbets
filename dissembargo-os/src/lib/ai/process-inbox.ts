@@ -196,6 +196,96 @@ export async function processPendingInboxEmails(limit = 20) {
   return results;
 }
 
+/**
+ * Reprocess previously imported emails that were classified before the
+ * Potential Opportunity workflow existed (or never staged as leads).
+ */
+export async function backfillPotentialOpportunities(options?: {
+  userId?: string;
+  limit?: number;
+}): Promise<{
+  processed: number;
+  potentialOpportunities: number;
+  failed: number;
+  results: ProcessInboxResult[];
+}> {
+  const supabase = await createServiceClient();
+  const limit = options?.limit ?? 30;
+
+  let potentialQuery = supabase.from("potential_opportunities").select("inbox_id");
+  if (options?.userId) {
+    potentialQuery = potentialQuery.eq("user_id", options.userId);
+  }
+
+  const { data: existingPotentials, error: potentialError } =
+    await potentialQuery;
+
+  if (potentialError) throw potentialError;
+
+  const stagedInboxIds = new Set(
+    (existingPotentials ?? []).map((row) => row.inbox_id),
+  );
+
+  let inboxQuery = supabase
+    .from("inbox")
+    .select("id, ai_processing_status, review_status, opportunity_id")
+    .is("opportunity_id", null)
+    .order("date_received", { ascending: false })
+    .limit(limit * 4);
+
+  if (options?.userId) {
+    inboxQuery = inboxQuery.eq("user_id", options.userId);
+  }
+
+  const { data: inboxRows, error: inboxError } = await inboxQuery;
+
+  if (inboxError) throw inboxError;
+
+  const candidates = (inboxRows ?? []).filter((row) => {
+    if (stagedInboxIds.has(row.id)) return false;
+    if (row.review_status === "rejected") return false;
+    return true;
+  }).slice(0, limit);
+
+  const results: ProcessInboxResult[] = [];
+  let potentialOpportunities = 0;
+  let failed = 0;
+
+  for (const row of candidates) {
+    try {
+      const result =
+        row.ai_processing_status === "completed"
+          ? await reprocessInboxEmail(row.id)
+          : await processInboxEmail(row.id);
+
+      results.push(result);
+
+      if (result.status === "failed") {
+        failed += 1;
+      } else if (result.actionTaken === "potential_opportunity") {
+        potentialOpportunities += 1;
+      }
+    } catch (error) {
+      failed += 1;
+      results.push({
+        inboxId: row.id,
+        status: "failed",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Backfill processing failed",
+      });
+    }
+  }
+
+  return {
+    processed: results.length,
+    potentialOpportunities,
+    failed,
+    results,
+  };
+}
+
 export async function reprocessInboxEmail(inboxId: string) {
   const supabase = await createServiceClient();
 

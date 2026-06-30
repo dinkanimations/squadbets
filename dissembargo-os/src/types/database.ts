@@ -1158,6 +1158,7 @@ export interface Database {
           refresh_token: string;
           token_expiry: string | null;
           history_id: string | null;
+          historical_import_page_token: string | null;
           last_sync_at: string | null;
           last_sync_status: string;
           last_sync_error: string | null;
@@ -1172,6 +1173,7 @@ export interface Database {
           refresh_token: string;
           token_expiry?: string | null;
           history_id?: string | null;
+          historical_import_page_token?: string | null;
           last_sync_at?: string | null;
           last_sync_status?: string;
           last_sync_error?: string | null;
@@ -1186,6 +1188,7 @@ export interface Database {
           refresh_token?: string;
           token_expiry?: string | null;
           history_id?: string | null;
+          historical_import_page_token?: string | null;
           last_sync_at?: string | null;
           last_sync_status?: string;
           last_sync_error?: string | null;

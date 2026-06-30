@@ -29,6 +29,9 @@ export function formatGmailSyncResult(data: {
   status?: string;
   imported?: number;
   skipped?: number;
+  historicalImported?: number;
+  backfillProcessed?: number;
+  potentialOpportunitiesFound?: number;
   error?: string;
 }): { message: string; isError: boolean } {
   if (data.status === "error") {
@@ -39,16 +42,41 @@ export function formatGmailSyncResult(data: {
   }
 
   const imported = data.imported ?? 0;
+  const historicalImported = data.historicalImported ?? 0;
+  const potentialOpportunitiesFound = data.potentialOpportunitiesFound ?? 0;
+  const backfillProcessed = data.backfillProcessed ?? 0;
 
-  if (imported === 0) {
+  const parts: string[] = [];
+
+  if (imported > 0) {
+    parts.push(
+      `imported ${imported} new email${imported === 1 ? "" : "s"}`,
+    );
+  }
+
+  if (historicalImported > 0) {
+    parts.push(
+      `pulled ${historicalImported} older email${historicalImported === 1 ? "" : "s"} from Gmail`,
+    );
+  }
+
+  if (potentialOpportunitiesFound > 0) {
+    parts.push(
+      `found ${potentialOpportunitiesFound} potential opportunit${potentialOpportunitiesFound === 1 ? "y" : "ies"}`,
+    );
+  } else if (backfillProcessed > 0) {
+    parts.push(`rescanned ${backfillProcessed} older email${backfillProcessed === 1 ? "" : "s"}`);
+  }
+
+  if (parts.length === 0) {
     return {
       isError: false,
-      message: "Sync complete — no new emails to import.",
+      message: "Sync complete — inbox is up to date.",
     };
   }
 
   return {
     isError: false,
-    message: `Imported ${imported} email${imported === 1 ? "" : "s"}.`,
+    message: `Sync complete — ${parts.join(", ")}.`,
   };
 }

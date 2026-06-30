@@ -62,11 +62,26 @@ export async function POST(request: Request) {
   const results = await syncUserGmailConnections(user.id);
   const imported = results.reduce((sum, item) => sum + item.imported, 0);
   const skipped = results.reduce((sum, item) => sum + item.skipped, 0);
+  const historicalImported = results.reduce(
+    (sum, item) => sum + item.historicalImported,
+    0,
+  );
+  const backfillProcessed = results.reduce(
+    (sum, item) => sum + item.backfillProcessed,
+    0,
+  );
+  const potentialOpportunitiesFound = results.reduce(
+    (sum, item) => sum + item.potentialOpportunitiesFound,
+    0,
+  );
   const hasError = results.some((item) => item.status === "error");
 
   return NextResponse.json({
     imported,
     skipped,
+    historicalImported,
+    backfillProcessed,
+    potentialOpportunitiesFound,
     status: hasError ? "error" : "success",
     results,
   });

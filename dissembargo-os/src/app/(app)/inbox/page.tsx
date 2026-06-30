@@ -64,7 +64,7 @@ async function InboxContent() {
       ) : opportunities.length === 0 ? (
         <EmptyState
           title="No potential opportunities"
-          description="Sync Gmail from Integrations. The AI will scan new emails and surface genuine job enquiries here — newsletters, invoices, and spam are ignored."
+          description="Sync Gmail from Integrations. The AI scans new and older emails each sync — genuine job enquiries appear here as potential opportunities."
           action={
             <Link href="/settings/integrations">
               <Button>Sync Gmail</Button>
