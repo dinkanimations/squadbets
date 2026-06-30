@@ -10,6 +10,7 @@ import {
   formatQuoteDate,
 } from "@/lib/quotes/calculations";
 import type { QuoteFormDraft } from "@/lib/quotes/constants";
+import { DEFAULT_QUOTE_VERSION } from "@/lib/quotes/constants";
 import type { QuotePdfData } from "@/lib/pdf/quote/types";
 
 export type QuotePreviewMeta = {
@@ -80,7 +81,7 @@ export function buildQuotePreviewData(
 
   return {
     quoteNumber: meta.quoteNumber ?? "DRAFT",
-    version: draft.version.trim() || null,
+    version: draft.version.trim() || DEFAULT_QUOTE_VERSION,
     clientName: draft.clientName.trim() || "Client",
     projectTitle: draft.projectTitle.trim() || "Project Quotation",
     issueDate,

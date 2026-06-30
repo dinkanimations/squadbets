@@ -24,6 +24,7 @@ import { DeliverablesSpreadsheet } from "./DeliverablesSpreadsheet";
 import { BudgetSpreadsheet } from "./BudgetSpreadsheet";
 import { QuoteTotalsBar } from "./QuoteTotalsBar";
 import { QuoteLivePreview } from "./QuoteLivePreview";
+import { SaveToast } from "./SaveToast";
 import {
   createQuoteAction,
   duplicateQuoteAction,
@@ -35,12 +36,18 @@ import {
   createEmptyQuoteDraft,
   type QuoteFormDraft,
 } from "@/lib/quotes/constants";
+import { serializeQuoteDraft } from "@/lib/quotes/draft-serializer";
 import { buildQuotePreviewData } from "@/lib/quotes/preview-data";
 import type { AppSettingsData } from "@/lib/settings/types";
 import type { QuoteStatus } from "@/types/database";
 import { cn } from "@/lib/utils/cn";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+type ToastState = {
+  message: string;
+  type: "success" | "error";
+} | null;
 
 interface QuoteBuilderProps {
   quoteId?: string;
@@ -52,10 +59,11 @@ interface QuoteBuilderProps {
 }
 
 function formatLastSaved(date: Date): string {
+  const elapsedMs = Date.now() - date.getTime();
+  if (elapsedMs < 60_000) return "Just now";
   return date.toLocaleString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
   });
 }
 
@@ -68,36 +76,54 @@ export function QuoteBuilder({
   settings,
 }: QuoteBuilderProps) {
   const router = useRouter();
-  const [draft, setDraft] = useState<QuoteFormDraft>(
-    initialDraft ?? createEmptyQuoteDraft(),
-  );
+  const startingDraft = initialDraft ?? createEmptyQuoteDraft();
+  const [draft, setDraft] = useState<QuoteFormDraft>(startingDraft);
   const [activeQuoteId, setActiveQuoteId] = useState(initialQuoteId);
   const [activeQuoteNumber, setActiveQuoteNumber] = useState(initialQuoteNumber);
+  const [issueDate, setIssueDate] = useState(
+    createdAt ?? new Date().toISOString(),
+  );
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(
     updatedAt ? new Date(updatedAt) : null,
   );
+  const [lastSavedLabel, setLastSavedLabel] = useState(
+    updatedAt ? formatLastSaved(new Date(updatedAt)) : "",
+  );
   const [isPending, startTransition] = useTransition();
+  const [, setRelativeTimeTick] = useState(0);
+
   const skipAutoSave = useRef(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isSaving = useRef(false);
+  const draftRef = useRef(draft);
+  const activeQuoteIdRef = useRef(activeQuoteId);
+  const savedSnapshotRef = useRef(serializeQuoteDraft(startingDraft));
+  const saveChainRef = useRef<Promise<boolean>>(Promise.resolve(true));
+
+  draftRef.current = draft;
+  activeQuoteIdRef.current = activeQuoteId;
+
+  const isDirty = useMemo(
+    () => serializeQuoteDraft(draft) !== savedSnapshotRef.current,
+    [draft],
+  );
 
   const previewData = useMemo(
     () =>
       buildQuotePreviewData(draft, settings, {
         quoteNumber: activeQuoteNumber,
-        issueDate: createdAt,
+        issueDate,
       }),
-    [draft, settings, activeQuoteNumber, createdAt],
+    [draft, settings, activeQuoteNumber, issueDate],
   );
 
-  const updateDraft = useCallback((patch: Partial<QuoteFormDraft>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-    setSaveState("idle");
-    setActionMessage(null);
-  }, []);
+  const showToast = useCallback(
+    (message: string, type: "success" | "error") => {
+      setToast({ message, type });
+    },
+    [],
+  );
 
   const clearPendingAutoSave = useCallback(() => {
     if (saveTimer.current) {
@@ -106,67 +132,88 @@ export function QuoteBuilder({
     }
   }, []);
 
+  const markSaved = useCallback((options?: { manual?: boolean }) => {
+    const savedAt = new Date();
+    savedSnapshotRef.current = serializeQuoteDraft(draftRef.current);
+    setLastSavedAt(savedAt);
+    setLastSavedLabel("Just now");
+    setSaveState("saved");
+    if (options?.manual) {
+      showToast("Draft saved successfully.", "success");
+    }
+  }, [showToast]);
+
   const persistQuote = useCallback(
-    async (status?: QuoteStatus, options?: { manual?: boolean }) => {
-      if (isSaving.current) {
-        return false;
-      }
+    (status?: QuoteStatus, options?: { manual?: boolean }) => {
+      const runSave = async (): Promise<boolean> => {
+        clearPendingAutoSave();
+        setSaveState("saving");
 
-      isSaving.current = true;
-      clearPendingAutoSave();
-      setSaveState("saving");
-      setSaveError(null);
-      if (options?.manual) {
-        setActionMessage(null);
-      }
+        const payload = {
+          ...draftRef.current,
+          companyId: draftRef.current.companyId || null,
+          status: status ?? draftRef.current.status,
+        };
 
-      const payload = {
-        ...draft,
-        companyId: draft.companyId || null,
-        status: status ?? draft.status,
+        try {
+          const quoteId = activeQuoteIdRef.current;
+
+          if (!quoteId) {
+            const result = await createQuoteAction(JSON.stringify(payload));
+            if (result.error) {
+              setSaveState("error");
+              if (options?.manual) {
+                showToast(result.error, "error");
+              }
+              return false;
+            }
+
+            if (result.id) {
+              activeQuoteIdRef.current = result.id;
+              setActiveQuoteId(result.id);
+              if (result.quoteNumber) {
+                setActiveQuoteNumber(result.quoteNumber);
+              }
+              if (!createdAt) {
+                setIssueDate(new Date().toISOString());
+              }
+              window.history.replaceState(null, "", `/quotes/${result.id}`);
+            }
+          } else {
+            const result = await updateQuoteAction(
+              quoteId,
+              JSON.stringify(payload),
+            );
+            if (result.error) {
+              setSaveState("error");
+              if (options?.manual) {
+                showToast(result.error, "error");
+              }
+              return false;
+            }
+          }
+
+          markSaved(options);
+          router.refresh();
+          return true;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Failed to save quote.";
+          setSaveState("error");
+          if (options?.manual) {
+            showToast(message, "error");
+          }
+          return false;
+        }
       };
 
-      try {
-        if (!activeQuoteId) {
-          const result = await createQuoteAction(JSON.stringify(payload));
-          if (result.error) {
-            setSaveError(result.error);
-            setSaveState("error");
-            return false;
-          }
+      saveChainRef.current = saveChainRef.current
+        .then(() => runSave())
+        .catch(() => false);
 
-          if (result.id) {
-            setActiveQuoteId(result.id);
-            if (result.quoteNumber) {
-              setActiveQuoteNumber(result.quoteNumber);
-            }
-            window.history.replaceState(null, "", `/quotes/${result.id}`);
-          }
-        } else {
-          const result = await updateQuoteAction(
-            activeQuoteId,
-            JSON.stringify(payload),
-          );
-          if (result.error) {
-            setSaveError(result.error);
-            setSaveState("error");
-            return false;
-          }
-        }
-
-        const savedAt = new Date();
-        setLastSavedAt(savedAt);
-        setSaveState("saved");
-        if (options?.manual) {
-          setActionMessage("Draft saved successfully.");
-        }
-        router.refresh();
-        return true;
-      } finally {
-        isSaving.current = false;
-      }
+      return saveChainRef.current;
     },
-    [activeQuoteId, clearPendingAutoSave, draft, router],
+    [clearPendingAutoSave, createdAt, markSaved, router, showToast],
   );
 
   useEffect(() => {
@@ -183,28 +230,55 @@ export function QuoteBuilder({
     return clearPendingAutoSave;
   }, [clearPendingAutoSave, draft, persistQuote]);
 
+  useEffect(() => {
+    if (!lastSavedAt) return;
+
+    const interval = setInterval(() => {
+      setLastSavedLabel(formatLastSaved(lastSavedAt));
+      setRelativeTimeTick((value) => value + 1);
+    }, 10_000);
+
+    return () => clearInterval(interval);
+  }, [lastSavedAt]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty || saveState === "saving") return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty, saveState]);
+
   const handleSaveDraft = () => {
     clearPendingAutoSave();
-    startTransition(async () => {
-      await persistQuote("draft", { manual: true });
-    });
+    void persistQuote("draft", { manual: true });
+  };
+
+  const handleNavigateAway = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!isDirty || saveState === "saving") return;
+    const confirmed = window.confirm(
+      "You have unsaved changes. Leave this page without saving?",
+    );
+    if (!confirmed) {
+      event.preventDefault();
+    }
   };
 
   const handleGeneratePdf = () => {
     if (!activeQuoteId) {
-      setSaveError("Save the quote before generating a PDF.");
-      setSaveState("error");
+      showToast("Save the quote before generating a PDF.", "error");
       return;
     }
 
-    setActionMessage(null);
     startTransition(async () => {
       const result = await regenerateQuotePdfAction(activeQuoteId);
       if (result.error) {
-        setSaveError(result.error);
-        setSaveState("error");
+        showToast(result.error, "error");
       } else {
-        setActionMessage(result.success ?? "PDF generated.");
+        showToast(result.success ?? "PDF generated.", "success");
         router.refresh();
       }
     });
@@ -216,8 +290,7 @@ export function QuoteBuilder({
     startTransition(async () => {
       const result = await duplicateQuoteAction(activeQuoteId);
       if (result.error) {
-        setSaveError(result.error);
-        setSaveState("error");
+        showToast(result.error, "error");
       } else if (result.id) {
         router.push(`/quotes/${result.id}`);
       }
@@ -233,40 +306,49 @@ export function QuoteBuilder({
       ? draft.deliverables
       : [createEmptyDeliverable()];
 
+  const updateDraft = useCallback((patch: Partial<QuoteFormDraft>) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+    setSaveState("idle");
+  }, []);
+
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-4">
+      {toast ? (
+        <SaveToast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href="/quotes"
+          onClick={handleNavigateAway}
           className="inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Quotes
         </Link>
 
-        <div className="flex flex-col items-end gap-1 text-xs">
-          <div className="flex items-center gap-2 text-muted">
+        <div className="flex flex-col items-end gap-1 text-xs text-muted">
+          <div className="flex items-center gap-2">
             {saveState === "saving" && (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Saving...
               </>
             )}
-            {saveState === "saved" && !actionMessage && (
+            {saveState === "saved" && !isDirty && (
               <span className="text-success">All changes saved</span>
             )}
-            {lastSavedAt && (
-              <span className="text-muted">
-                Last saved {formatLastSaved(lastSavedAt)}
-              </span>
+            {isDirty && saveState !== "saving" && (
+              <span>Unsaved changes</span>
             )}
           </div>
-          {saveState === "error" && saveError && (
-            <span className="text-danger">{saveError}</span>
-          )}
-          {actionMessage && saveState !== "error" && (
-            <span className="text-success">{actionMessage}</span>
-          )}
+          {lastSavedAt ? (
+            <span>Last saved: {lastSavedLabel}</span>
+          ) : null}
         </div>
       </div>
 
@@ -274,7 +356,7 @@ export function QuoteBuilder({
         clientName={draft.clientName}
         projectTitle={draft.projectTitle}
         version={draft.version}
-        issueDate={createdAt}
+        issueDate={issueDate}
         onClientNameChange={(clientName) => updateDraft({ clientName })}
         onProjectTitleChange={(projectTitle) => updateDraft({ projectTitle })}
         onVersionChange={(version) => updateDraft({ version })}
@@ -311,16 +393,19 @@ export function QuoteBuilder({
           <Button
             type="button"
             variant="secondary"
-            disabled={isPending || saveState === "saving"}
             onClick={handleSaveDraft}
           >
-            <Save className="h-4 w-4" />
+            {saveState === "saving" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
             Save Draft
           </Button>
 
           <Button
             type="button"
-            disabled={isPending || !activeQuoteId}
+            disabled={!activeQuoteId || isPending}
             onClick={handleGeneratePdf}
           >
             <FileText className="h-4 w-4" />
@@ -349,7 +434,7 @@ export function QuoteBuilder({
           <Button
             type="button"
             variant="secondary"
-            disabled={isPending || !activeQuoteId}
+            disabled={!activeQuoteId || isPending}
             onClick={handleDuplicate}
           >
             <Copy className="h-4 w-4" />

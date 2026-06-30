@@ -14,7 +14,10 @@ export function PdfHeader({ data }: { data: QuotePdfData }) {
       </View>
       <View style={{ alignItems: "flex-end" }}>
         <Text style={pdfStyles.quoteLabel}>Quotation</Text>
-        <Text style={pdfStyles.quoteNumber}>{data.quoteNumber}</Text>
+        <Text style={pdfStyles.quoteNumber}>{data.version}</Text>
+        <Text style={{ fontSize: 8, color: data.brand.colors.muted, marginTop: 2 }}>
+          {data.quoteNumber}
+        </Text>
       </View>
     </View>
   );
@@ -31,12 +34,10 @@ export function PdfMetaGrid({ data }: { data: QuotePdfData }) {
         <Text style={pdfStyles.metaLabel}>Project</Text>
         <Text style={pdfStyles.metaValue}>{data.projectTitle}</Text>
       </View>
-      {data.version ? (
-        <View style={pdfStyles.metaItem}>
-          <Text style={pdfStyles.metaLabel}>Version</Text>
-          <Text style={pdfStyles.metaValue}>{data.version}</Text>
-        </View>
-      ) : null}
+      <View style={pdfStyles.metaItem}>
+        <Text style={pdfStyles.metaLabel}>Version</Text>
+        <Text style={pdfStyles.metaValue}>{data.version}</Text>
+      </View>
       <View style={pdfStyles.metaItem}>
         <Text style={pdfStyles.metaLabel}>Date</Text>
         <Text style={pdfStyles.metaValue}>{data.issueDate}</Text>

@@ -142,6 +142,7 @@ export async function createQuoteAction(
     await saveQuoteChildren(quote.id, deliverables, sections);
 
     revalidatePath("/quotes");
+    revalidatePath(`/quotes/${quote.id}`);
     revalidatePath("/");
 
     return { id: quote.id, quoteNumber: quote.quote_number };

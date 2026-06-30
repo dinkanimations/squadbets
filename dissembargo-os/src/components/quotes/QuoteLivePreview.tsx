@@ -43,15 +43,16 @@ export function QuoteLivePreview({ data }: QuoteLivePreviewProps) {
                 className="text-sm font-bold"
                 style={{ color: brand.colors.accent }}
               >
-                {data.quoteNumber}
+                {data.version}
               </p>
+              <p className="text-[9px] text-zinc-400">{data.quoteNumber}</p>
             </div>
           </header>
 
           <div className="mb-5 grid grid-cols-2 gap-3 text-[10px]">
             <PreviewMeta label="Client" value={data.clientName} />
             <PreviewMeta label="Project" value={data.projectTitle} />
-            <PreviewMeta label="Version" value={data.version ?? "—"} />
+            <PreviewMeta label="Version" value={data.version} />
             <PreviewMeta label="Date" value={data.issueDate} />
             <PreviewMeta label="Valid Until" value={data.expiryDate} />
           </div>

@@ -1,4 +1,5 @@
 import type { QuoteFull } from "@/lib/database/quotes";
+import { DEFAULT_QUOTE_VERSION } from "@/lib/quotes/constants";
 import {
   calculateDiscountAmount,
   calculateGrandTotal,
@@ -70,7 +71,7 @@ export async function buildQuotePdfData(quote: QuoteFull): Promise<QuotePdfData>
 
   return {
     quoteNumber: quote.quote_number,
-    version: quote.version,
+    version: quote.version?.trim() || DEFAULT_QUOTE_VERSION,
     clientName: quote.client_name ?? quote.company?.company_name ?? "Client",
     projectTitle: quote.project_title ?? "Project Quotation",
     issueDate: formatPdfDate(quote.created_at),
