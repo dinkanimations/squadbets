@@ -23,13 +23,11 @@ function createServiceRoleClient() {
   });
 }
 
-export async function createClient() {
-  if (isAuthDisabled()) {
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return createServiceRoleClient();
-    }
-  }
-
+/**
+ * Cookie-based Supabase client using the anon key.
+ * Always use this for authentication (sign-in, sign-out, password reset, callbacks).
+ */
+export async function createAuthClient() {
   const cookieStore = await cookies();
   const { url, anonKey } = getSupabaseEnv();
 
@@ -50,4 +48,18 @@ export async function createClient() {
       },
     },
   });
+}
+
+/**
+ * Server Supabase client for data access.
+ * Uses service role only when DISABLE_AUTH is enabled in development.
+ */
+export async function createClient() {
+  if (isAuthDisabled()) {
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return createServiceRoleClient();
+    }
+  }
+
+  return createAuthClient();
 }
