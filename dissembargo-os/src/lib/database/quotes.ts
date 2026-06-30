@@ -12,6 +12,7 @@ import type { QuotesFilter } from "@/lib/quotes/types";
 import {
   getPaginationRange,
   handleDatabaseError,
+  isMissingSchemaError,
   withDevDbFallback,
   type PaginationOptions,
 } from "./utils";
@@ -100,7 +101,10 @@ export async function getQuotesFiltered(
 
     const { data, error, count } = await query;
 
-    if (error) handleDatabaseError(error, "Failed to fetch quotes");
+    if (error) {
+      if (isMissingSchemaError(error)) return { data: [], count: 0 };
+      handleDatabaseError(error, "Failed to fetch quotes");
+    }
 
     return { data: data as QuoteWithRelations[], count: count ?? 0 };
   }, { data: [], count: 0 });
