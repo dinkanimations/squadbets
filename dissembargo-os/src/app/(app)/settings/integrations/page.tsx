@@ -40,7 +40,6 @@ export default async function IntegrationsSettingsPage({
       <IntegrationsPanel
         gmailConnections={status.gmail}
         google={status.google}
-        openai={status.openai}
         supabase={status.supabase}
         gmailMessage={gmailMessage}
         gmailError={gmailError}
