@@ -9,6 +9,7 @@
     "lint": "eslint",
     "auth:verify": "node scripts/verify-auth.mjs",
     "auth:setup": "node scripts/setup-auth-env.mjs",
+    "gmail:verify": "node scripts/verify-gmail.mjs",
     "setup": "node scripts/full-setup.mjs",
     "db:check": "node scripts/check-schema.mjs",
     "db:apply": "node scripts/apply-migrations-pg.mjs",

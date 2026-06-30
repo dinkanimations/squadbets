@@ -5,12 +5,25 @@ import {
   getUserGmailConnectionsForSync,
 } from "@/lib/database/gmail-connections";
 import { syncGmailConnection, syncUserGmailConnections } from "@/lib/gmail/sync";
+import { hasGoogleOAuthEnv } from "@/lib/gmail/client";
+
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const { user, error } = await getUser();
 
   if (error || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!hasGoogleOAuthEnv()) {
+    return NextResponse.json(
+      {
+        error:
+          "Google OAuth is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.local.",
+      },
+      { status: 503 },
+    );
   }
 
   let connectionId: string | null = null;

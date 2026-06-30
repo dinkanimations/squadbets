@@ -9,6 +9,7 @@ import {
   SYNC_INTERVAL_MINUTES,
   getGmailSyncStatusLabel,
 } from "@/lib/gmail/constants";
+import { formatGmailSyncResult } from "@/lib/gmail/errors";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -16,6 +17,11 @@ import { formatDateTime } from "@/lib/inbox/utils";
 
 interface GmailConnectionCardProps {
   connections: GmailConnectionStatus[];
+  google: {
+    configured: boolean;
+    redirectUri: string;
+    serviceRoleConfigured: boolean;
+  };
   message?: string | null;
   error?: string | null;
 }
@@ -63,9 +69,14 @@ function AccountRow({
           return;
         }
 
-        setSyncMessage(
-          `Imported ${data.imported} email${data.imported === 1 ? "" : "s"}.`,
-        );
+        const result = formatGmailSyncResult(data);
+        if (result.isError) {
+          setSyncError(result.message);
+          onSyncComplete();
+          return;
+        }
+
+        setSyncMessage(result.message);
         onSyncComplete();
       } catch {
         setSyncError("Unable to sync this account right now.");
@@ -145,6 +156,7 @@ function AccountRow({
 
 export function GmailConnectionCard({
   connections,
+  google,
   message,
   error,
 }: GmailConnectionCardProps) {
@@ -167,9 +179,14 @@ export function GmailConnectionCard({
           return;
         }
 
-        setSyncAllMessage(
-          `Imported ${data.imported} email${data.imported === 1 ? "" : "s"} across all accounts.`,
-        );
+        const result = formatGmailSyncResult(data);
+        if (result.isError) {
+          setSyncAllError(result.message);
+          router.refresh();
+          return;
+        }
+
+        setSyncAllMessage(result.message);
         router.refresh();
       } catch {
         setSyncAllError("Unable to sync Gmail accounts right now.");
@@ -193,6 +210,29 @@ export function GmailConnectionCard({
       {error && (
         <p className="mb-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
+        </p>
+      )}
+
+      {!google.configured && (
+        <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Google OAuth not configured</p>
+          <p className="mt-1 text-muted">
+            Add <code className="rounded bg-surface px-1">GOOGLE_CLIENT_ID</code>{" "}
+            and <code className="rounded bg-surface px-1">GOOGLE_CLIENT_SECRET</code>{" "}
+            to <code className="rounded bg-surface px-1">.env.local</code>, then restart{" "}
+            <code className="rounded bg-surface px-1">npm run dev</code>.
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            Redirect URI for Google Cloud Console:{" "}
+            <code className="break-all">{google.redirectUri}</code>
+          </p>
+        </div>
+      )}
+
+      {google.configured && !google.serviceRoleConfigured && (
+        <p className="mb-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+          Missing <code>SUPABASE_SERVICE_ROLE_KEY</code> — Gmail sync cannot save
+          tokens or import emails without it.
         </p>
       )}
 
@@ -251,8 +291,9 @@ export function GmailConnectionCard({
       )}
 
       <p className="mt-4 text-xs text-muted">
-        Status: {Object.values(GMAIL_SYNC_STATUS_LABELS).join(" · ")}. OAuth
-        tokens are stored securely server-side and refreshed automatically.
+        Status: {Object.values(GMAIL_SYNC_STATUS_LABELS).join(" · ")}. On local
+        dev, use <strong>Sync Now</strong> — automatic 5-minute sync runs when
+        deployed to Vercel with <code>CRON_SECRET</code> set.
       </p>
     </Card>
   );

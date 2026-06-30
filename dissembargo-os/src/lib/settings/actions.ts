@@ -316,6 +316,11 @@ export async function getIntegrationStatusAction() {
     "@/lib/database/gmail-connections"
   );
   const { hasOpenAIEnv } = await import("@/lib/ai/client");
+  const {
+    hasGoogleOAuthEnv,
+    getGoogleOAuthRedirectUri,
+  } = await import("@/lib/gmail/client");
+  const { hasAdminClientEnv } = await import("@/lib/supabase/admin");
 
   const gmail = await getUserGmailConnections();
 
@@ -326,6 +331,11 @@ export async function getIntegrationStatusAction() {
 
   return {
     gmail,
+    google: {
+      configured: hasGoogleOAuthEnv(),
+      redirectUri: getGoogleOAuthRedirectUri(),
+      serviceRoleConfigured: hasAdminClientEnv(),
+    },
     openai: {
       configured: hasOpenAIEnv(),
       model: "gpt-4o-mini",

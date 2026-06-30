@@ -6,6 +6,7 @@ import {
   refreshAccessToken,
 } from "./client";
 import { parseGmailMessage } from "./parse";
+import { INITIAL_SYNC_MAX_MESSAGES } from "./constants";
 import { processInboxEmail } from "@/lib/ai/process-inbox";
 
 export type SyncResult = {
@@ -105,6 +106,7 @@ async function importMessage(
 
 async function listInboxMessageIds(
   connection: GmailConnection,
+  maxMessages = INITIAL_SYNC_MAX_MESSAGES,
 ): Promise<string[]> {
   const { accessToken, refreshToken } = await getValidAccessToken(connection);
   const gmail = createGmailClient(accessToken, refreshToken);
@@ -116,16 +118,16 @@ async function listInboxMessageIds(
     const response = await gmail.users.messages.list({
       userId: "me",
       labelIds: ["INBOX"],
-      maxResults: 100,
+      maxResults: Math.min(100, maxMessages - messageIds.length),
       pageToken,
     });
 
     const messages = response.data.messages ?? [];
     messageIds.push(...messages.map((message) => message.id!).filter(Boolean));
     pageToken = response.data.nextPageToken ?? undefined;
-  } while (pageToken);
+  } while (pageToken && messageIds.length < maxMessages);
 
-  return messageIds;
+  return messageIds.slice(0, maxMessages);
 }
 
 async function syncViaHistory(

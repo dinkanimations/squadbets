@@ -1,12 +1,41 @@
 import { google } from "googleapis";
 import { GMAIL_READONLY_SCOPE } from "./constants";
 
-export function getGoogleOAuthConfig() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+function normalizeSiteUrl(url: string) {
+  return url.replace(/\/+$/, "");
+}
 
-  if (!clientId || !clientSecret) {
+export function hasGoogleOAuthEnv(): boolean {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+
+  if (!clientId || !clientSecret) return false;
+
+  const placeholders = [
+    /^your[-_]/i,
+    /^YOUR_/i,
+    /^xxx+$/i,
+    /^changeme$/i,
+  ];
+
+  return !placeholders.some(
+    (pattern) => pattern.test(clientId) || pattern.test(clientSecret),
+  );
+}
+
+export function getGoogleOAuthRedirectUri() {
+  const siteUrl = normalizeSiteUrl(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  );
+
+  return `${siteUrl}/api/gmail/callback`;
+}
+
+export function getGoogleOAuthConfig() {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+
+  if (!hasGoogleOAuthEnv() || !clientId || !clientSecret) {
     throw new Error(
       "Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables.",
     );
@@ -15,7 +44,7 @@ export function getGoogleOAuthConfig() {
   return {
     clientId,
     clientSecret,
-    redirectUri: `${siteUrl}/api/gmail/callback`,
+    redirectUri: getGoogleOAuthRedirectUri(),
   };
 }
 

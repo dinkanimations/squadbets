@@ -7,6 +7,11 @@ import type { GmailConnectionStatus } from "@/lib/gmail/constants";
 
 interface IntegrationsPanelProps {
   gmailConnections: GmailConnectionStatus[];
+  google: {
+    configured: boolean;
+    redirectUri: string;
+    serviceRoleConfigured: boolean;
+  };
   openai: { configured: boolean; model: string };
   supabase: { configured: boolean; url: string | null };
   gmailMessage?: string | null;
@@ -15,6 +20,7 @@ interface IntegrationsPanelProps {
 
 export function IntegrationsPanel({
   gmailConnections,
+  google,
   openai,
   supabase,
   gmailMessage,
@@ -24,6 +30,7 @@ export function IntegrationsPanel({
     <div className="space-y-6">
       <GmailConnectionCard
         connections={gmailConnections}
+        google={google}
         message={gmailMessage}
         error={gmailError}
       />

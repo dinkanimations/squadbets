@@ -2,6 +2,7 @@ import { Settings } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { getIntegrationStatusAction } from "@/lib/settings/actions";
+import { formatGmailIntegrationError } from "@/lib/gmail/errors";
 
 interface IntegrationsPageProps {
   searchParams: Promise<{
@@ -25,7 +26,7 @@ export default async function IntegrationsSettingsPage({
     gmailMessage = "Gmail account disconnected.";
   } else if (params.gmail === "error") {
     gmailError = params.message
-      ? decodeURIComponent(params.message)
+      ? formatGmailIntegrationError(decodeURIComponent(params.message))
       : "Gmail connection failed.";
   }
 
@@ -38,6 +39,7 @@ export default async function IntegrationsSettingsPage({
       />
       <IntegrationsPanel
         gmailConnections={status.gmail}
+        google={status.google}
         openai={status.openai}
         supabase={status.supabase}
         gmailMessage={gmailMessage}
