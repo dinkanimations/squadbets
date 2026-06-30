@@ -1,69 +1,100 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { InboxEmail, InboxEmailInsert, InboxEmailUpdate } from "@/types/database";
+import type { InboxFilterCategory } from "@/lib/ai/constants";
+import { JOB_ENQUIRY_CATEGORY } from "@/lib/ai/constants";
 import {
   getPaginationRange,
   handleDatabaseError,
+  withDevDbFallback,
   type PaginationOptions,
 } from "./utils";
 
-export async function getInboxEmails(
-  options?: PaginationOptions & { unreadOnly?: boolean },
-) {
-  const supabase = await createClient();
-  const { from, to } = getPaginationRange({
-    page: options?.page,
-    pageSize: options?.pageSize ?? 50,
-  });
+export type InboxListOptions = PaginationOptions & {
+  filter?: InboxFilterCategory;
+};
 
-  let query = supabase
-    .from("inbox")
-    .select("*", { count: "exact" })
-    .order("date_received", { ascending: false })
-    .range(from, to);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyInboxFilter(query: any, filter?: InboxFilterCategory) {
+  if (!filter || filter === "all") return query;
 
-  if (options?.unreadOnly) {
-    query = query.eq("is_read", false);
+  switch (filter) {
+    case "job_enquiries":
+      return query.eq("ai_category", JOB_ENQUIRY_CATEGORY);
+    case "existing_clients":
+      return query.eq("ai_category", "existing_client");
+    case "invoices":
+      return query.eq("ai_category", "invoice");
+    case "marketing":
+      return query.in("ai_category", ["marketing", "newsletter"]);
+    case "spam":
+      return query.eq("ai_category", "spam");
+    case "unread":
+      return query.eq("is_read", false);
+    default:
+      return query;
   }
+}
 
-  const { data, error, count } = await query;
+export async function getInboxEmails(options?: InboxListOptions) {
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
+    const { from, to } = getPaginationRange({
+      page: options?.page,
+      pageSize: options?.pageSize ?? 50,
+    });
 
-  if (error) handleDatabaseError(error, "Failed to fetch inbox emails");
+    let query = supabase
+      .from("inbox")
+      .select("*", { count: "exact" })
+      .order("date_received", { ascending: false })
+      .range(from, to);
 
-  return { data: data as InboxEmail[], count: count ?? 0 };
+    query = applyInboxFilter(query, options?.filter);
+
+    const { data, error, count } = await query;
+
+    if (error) handleDatabaseError(error, "Failed to fetch inbox emails");
+
+    return { data: data as InboxEmail[], count: count ?? 0 };
+  }, { data: [] as InboxEmail[], count: 0 });
 }
 
 export async function getReviewQueueEmails(options?: PaginationOptions) {
-  const supabase = await createClient();
-  const { from, to } = getPaginationRange({
-    page: options?.page,
-    pageSize: options?.pageSize ?? 50,
-  });
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
+    const { from, to } = getPaginationRange({
+      page: options?.page,
+      pageSize: options?.pageSize ?? 50,
+    });
 
-  const { data, error, count } = await supabase
-    .from("inbox")
-    .select("*", { count: "exact" })
-    .eq("review_status", "pending_review")
-    .order("ai_processed_at", { ascending: false })
-    .range(from, to);
+    const { data, error, count } = await supabase
+      .from("inbox")
+      .select("*", { count: "exact" })
+      .eq("review_status", "pending_review")
+      .order("ai_processed_at", { ascending: false })
+      .range(from, to);
 
-  if (error) handleDatabaseError(error, "Failed to fetch review queue");
+    if (error) handleDatabaseError(error, "Failed to fetch review queue");
 
-  return { data: data as InboxEmail[], count: count ?? 0 };
+    return { data: data as InboxEmail[], count: count ?? 0 };
+  }, { data: [] as InboxEmail[], count: 0 });
 }
 
 export async function getInboxEmailById(id: string) {
-  const supabase = await createClient();
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("inbox")
-    .select("*")
-    .eq("id", id)
-    .single();
+    const { data, error } = await supabase
+      .from("inbox")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  if (error) handleDatabaseError(error, `Failed to fetch inbox email ${id}`);
+    if (error) handleDatabaseError(error, `Failed to fetch inbox email ${id}`);
 
-  return data as InboxEmail;
+    return data as InboxEmail;
+  }, null as unknown as InboxEmail);
 }
 
 export async function countInboxEmails(options?: {
@@ -71,47 +102,51 @@ export async function countInboxEmails(options?: {
   importedSince?: string;
   reviewPending?: boolean;
 }) {
-  const supabase = await createClient();
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
 
-  let query = supabase
-    .from("inbox")
-    .select("id", { count: "exact", head: true });
+    let query = supabase
+      .from("inbox")
+      .select("id", { count: "exact", head: true });
 
-  if (options?.unreadOnly) {
-    query = query.eq("is_read", false);
-  }
+    if (options?.unreadOnly) {
+      query = query.eq("is_read", false);
+    }
 
-  if (options?.importedSince) {
-    query = query.gte("imported_at", options.importedSince);
-  }
+    if (options?.importedSince) {
+      query = query.gte("imported_at", options.importedSince);
+    }
 
-  if (options?.reviewPending) {
-    query = query.eq("review_status", "pending_review");
-  }
+    if (options?.reviewPending) {
+      query = query.eq("review_status", "pending_review");
+    }
 
-  const { count, error } = await query;
+    const { count, error } = await query;
 
-  if (error) handleDatabaseError(error, "Failed to count inbox emails");
+    if (error) handleDatabaseError(error, "Failed to count inbox emails");
 
-  return count ?? 0;
+    return count ?? 0;
+  }, 0);
 }
 
 export async function countOpportunitiesCreatedToday() {
-  const supabase = await createClient();
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-  const { count, error } = await supabase
-    .from("opportunities")
-    .select("id", { count: "exact", head: true })
-    .not("inbox_id", "is", null)
-    .gte("created_at", startOfDay.toISOString());
+    const { count, error } = await supabase
+      .from("opportunities")
+      .select("id", { count: "exact", head: true })
+      .not("inbox_id", "is", null)
+      .gte("created_at", startOfDay.toISOString());
 
-  if (error) {
-    handleDatabaseError(error, "Failed to count opportunities created today");
-  }
+    if (error) {
+      handleDatabaseError(error, "Failed to count opportunities created today");
+    }
 
-  return count ?? 0;
+    return count ?? 0;
+  }, 0);
 }
 
 export async function markInboxEmailAsRead(id: string) {
@@ -129,13 +164,13 @@ export async function markInboxEmailAsRead(id: string) {
   return data as InboxEmail;
 }
 
-export async function updateInboxEmailAdmin(
+export async function updateInboxEmail(
   id: string,
   input: InboxEmailUpdate,
 ) {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
-  const { data, error } = await admin
+  const { data, error } = await supabase
     .from("inbox")
     .update(input)
     .eq("id", id)

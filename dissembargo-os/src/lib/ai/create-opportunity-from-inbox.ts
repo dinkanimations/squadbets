@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { InboxEmail } from "@/types/database";
 import type { AiClassificationResult } from "./constants";
 import { AI_CATEGORY_LABELS } from "./constants";
@@ -14,9 +14,11 @@ export async function createOpportunityFromInbox(
   overrides?: {
     companyName?: string;
     category?: string;
+    estimatedBudget?: number | null;
+    requestedDeliverables?: string | null;
   },
 ) {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
   const companyName =
     overrides?.companyName?.trim() ||
@@ -47,7 +49,15 @@ export async function createOpportunityFromInbox(
   const aiCategory =
     overrides?.category || AI_CATEGORY_LABELS[classification.category];
 
-  const { data: opportunity, error: opportunityError } = await admin
+  const estimatedBudget =
+    overrides?.estimatedBudget ?? classification.estimated_budget ?? null;
+
+  const requestedDeliverables =
+    overrides?.requestedDeliverables ??
+    classification.requested_deliverables ??
+    null;
+
+  const { data: opportunity, error: opportunityError } = await supabase
     .from("opportunities")
     .insert({
       company_id: company.id,
@@ -58,6 +68,8 @@ export async function createOpportunityFromInbox(
       ai_confidence: classification.confidence,
       opportunity_status: "new",
       notes: classification.summary,
+      estimated_budget: estimatedBudget,
+      requested_deliverables: requestedDeliverables,
       inbox_id: inbox.id,
     })
     .select()
@@ -67,7 +79,7 @@ export async function createOpportunityFromInbox(
     throw new Error(`Failed to create opportunity: ${opportunityError.message}`);
   }
 
-  await admin
+  await supabase
     .from("inbox")
     .update({
       opportunity_id: opportunity.id,

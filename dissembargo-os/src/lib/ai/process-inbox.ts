@@ -1,13 +1,18 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { InboxEmail } from "@/types/database";
 import { classifyEmail } from "./classify-email";
 import { createOpportunityFromInbox } from "./create-opportunity-from-inbox";
 import {
   AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD,
+  isJobEnquiryCategory,
   type AiActionTaken,
   type AiEmailCategory,
 } from "./constants";
 import { logAiClassification } from "@/lib/database/ai-logs";
+import {
+  formatThreadContext,
+  inboxEmailToThreadContext,
+} from "./thread-context";
 
 export type ProcessInboxResult = {
   inboxId: string;
@@ -17,9 +22,9 @@ export type ProcessInboxResult = {
 };
 
 async function getInboxById(inboxId: string): Promise<InboxEmail | null> {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
-  const { data, error } = await admin
+  const { data, error } = await supabase
     .from("inbox")
     .select("*")
     .eq("id", inboxId)
@@ -29,10 +34,44 @@ async function getInboxById(inboxId: string): Promise<InboxEmail | null> {
   return data;
 }
 
+async function getThreadContextForInbox(
+  inbox: InboxEmail,
+): Promise<string | null> {
+  if (!inbox.thread_id) return null;
+
+  const supabase = await createServiceClient();
+
+  const { data, error } = await supabase
+    .from("inbox")
+    .select("*")
+    .eq("user_id", inbox.user_id)
+    .eq("thread_id", inbox.thread_id)
+    .neq("id", inbox.id)
+    .order("date_received", { ascending: true })
+    .limit(10);
+
+  if (error || !data?.length) return null;
+
+  return formatThreadContext(data.map(inboxEmailToThreadContext));
+}
+
+function resolveReviewStatus(
+  category: AiEmailCategory,
+  confidence: number,
+): "pending_review" | "auto_created" | null {
+  if (!isJobEnquiryCategory(category)) return null;
+
+  if (confidence >= AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD) {
+    return "auto_created";
+  }
+
+  return "pending_review";
+}
+
 export async function processInboxEmail(
   inboxId: string,
 ): Promise<ProcessInboxResult> {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
   const inbox = await getInboxById(inboxId);
 
@@ -47,7 +86,7 @@ export async function processInboxEmail(
     return { inboxId, status: "completed", actionTaken: "classified_only" };
   }
 
-  await admin
+  await supabase
     .from("inbox")
     .update({
       ai_processing_status: "processing",
@@ -56,32 +95,35 @@ export async function processInboxEmail(
     .eq("id", inboxId);
 
   try {
+    const threadContext = await getThreadContextForInbox(inbox);
+
     const { result, rawResponse } = await classifyEmail({
       subject: inbox.subject,
       senderName: inbox.sender_name,
       senderEmail: inbox.sender_email,
       bodyPlain: inbox.body_plain,
       bodyHtml: inbox.body_html,
+      threadContext,
     });
 
     let actionTaken: AiActionTaken = "classified_only";
-    let reviewStatus: "pending_review" | "auto_created" | null = null;
+    let reviewStatus = resolveReviewStatus(result.category, result.confidence);
     let opportunityId: string | null = inbox.opportunity_id;
 
     if (
-      result.category === "new_business_opportunity" &&
+      isJobEnquiryCategory(result.category) &&
       result.confidence >= AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD
     ) {
       const opportunity = await createOpportunityFromInbox(inbox, result);
       opportunityId = opportunity.id;
-      reviewStatus = "auto_created";
       actionTaken = "auto_opportunity";
-    } else if (result.category === "new_business_opportunity") {
-      reviewStatus = "pending_review";
+    } else if (isJobEnquiryCategory(result.category)) {
       actionTaken = "review_queue";
+    } else {
+      reviewStatus = null;
     }
 
-    await admin
+    await supabase
       .from("inbox")
       .update({
         ai_category: result.category,
@@ -115,7 +157,7 @@ export async function processInboxEmail(
     const message =
       error instanceof Error ? error.message : "AI processing failed";
 
-    await admin
+    await supabase
       .from("inbox")
       .update({
         ai_processing_status: "failed",
@@ -140,9 +182,9 @@ export async function processInboxEmail(
 }
 
 export async function processPendingInboxEmails(limit = 20) {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
-  const { data: pendingEmails, error } = await admin
+  const { data: pendingEmails, error } = await supabase
     .from("inbox")
     .select("id")
     .in("ai_processing_status", ["pending", "failed"])
@@ -161,9 +203,9 @@ export async function processPendingInboxEmails(limit = 20) {
 }
 
 export async function reprocessInboxEmail(inboxId: string) {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
-  await admin
+  await supabase
     .from("inbox")
     .update({
       ai_processing_status: "pending",
@@ -178,19 +220,28 @@ export async function reprocessInboxEmail(inboxId: string) {
 export async function updateInboxAiCategory(
   inboxId: string,
   category: AiEmailCategory,
+  options?: { recordFeedback?: boolean; userId?: string },
 ) {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
   const inbox = await getInboxById(inboxId);
 
   if (!inbox) throw new Error("Inbox email not found");
 
-  const reviewStatus =
-    category === "new_business_opportunity" &&
-    (inbox.ai_confidence ?? 0) < AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD
-      ? "pending_review"
-      : inbox.review_status;
+  const originalCategory = inbox.ai_category;
 
-  const { data, error } = await admin
+  let reviewStatus: "pending_review" | "approved" | "rejected" | "auto_created" | null =
+    null;
+
+  if (isJobEnquiryCategory(category)) {
+    reviewStatus =
+      (inbox.ai_confidence ?? 0) < AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD
+        ? "pending_review"
+        : inbox.review_status === "auto_created"
+          ? "auto_created"
+          : inbox.review_status;
+  }
+
+  const { data, error } = await supabase
     .from("inbox")
     .update({
       ai_category: category,
@@ -212,6 +263,18 @@ export async function updateInboxAiCategory(
     rawResponse: { manual_update: true },
     actionTaken: "classified_only",
   });
+
+  if (options?.recordFeedback && originalCategory !== category) {
+    const { logAiClassificationFeedback } = await import("@/lib/database/ai-logs");
+    await logAiClassificationFeedback({
+      inboxId,
+      userId: options.userId ?? inbox.user_id,
+      originalCategory,
+      correctedCategory: category,
+      originalConfidence: inbox.ai_confidence,
+      feedbackAction: "reclassified",
+    });
+  }
 
   return data;
 }

@@ -1,21 +1,33 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getInboxEmailById } from "@/lib/database/inbox";
 import { createOpportunityFromInbox } from "@/lib/ai/create-opportunity-from-inbox";
 import {
   updateInboxAiCategory,
   reprocessInboxEmail,
 } from "@/lib/ai/process-inbox";
-import { logAiClassification } from "@/lib/database/ai-logs";
+import {
+  logAiClassification,
+  logAiClassificationFeedback,
+} from "@/lib/database/ai-logs";
 import type { AiClassificationResult, AiEmailCategory } from "@/lib/ai/constants";
-import { AI_CATEGORY_LABELS } from "@/lib/ai/constants";
+import {
+  AI_CATEGORY_LABELS,
+  isJobEnquiryCategory,
+} from "@/lib/ai/constants";
+import { getUser } from "@/lib/auth/session";
 
 export type ReviewActionState = {
   error?: string;
   success?: string;
 };
+
+async function getCurrentUserId(): Promise<string | null> {
+  const { user } = await getUser();
+  return user?.id ?? null;
+}
 
 export async function approveReviewAction(
   _prevState: ReviewActionState,
@@ -48,6 +60,8 @@ export async function approveReviewAction(
       company_name: companyName,
       contact_name: inbox.sender_name,
       website: inbox.detected_website,
+      estimated_budget: null,
+      requested_deliverables: null,
     };
 
     const opportunity = await createOpportunityFromInbox(inbox, classification, {
@@ -55,8 +69,8 @@ export async function approveReviewAction(
       category: AI_CATEGORY_LABELS[categoryValue],
     });
 
-    const admin = createAdminClient();
-    await admin
+    const supabase = await createServiceClient();
+    await supabase
       .from("inbox")
       .update({
         review_status: "approved",
@@ -65,6 +79,8 @@ export async function approveReviewAction(
         ai_category: categoryValue,
       })
       .eq("id", inboxId);
+
+    const userId = await getCurrentUserId();
 
     await logAiClassification({
       inboxId,
@@ -75,6 +91,16 @@ export async function approveReviewAction(
       aiReasoning: "Manually approved from review queue",
       rawResponse: { manual_approval: true, companyName },
       actionTaken: "auto_opportunity",
+    });
+
+    await logAiClassificationFeedback({
+      inboxId,
+      userId: userId ?? inbox.user_id,
+      originalCategory: inbox.ai_category,
+      correctedCategory: categoryValue,
+      originalConfidence: inbox.ai_confidence,
+      feedbackAction: "approved",
+      companyNameOverride: companyName,
     });
 
     revalidatePath("/review-queue");
@@ -96,9 +122,10 @@ export async function rejectReviewAction(
 ): Promise<ReviewActionState> {
   try {
     const inbox = await getInboxEmailById(inboxId);
-    const admin = createAdminClient();
+    const supabase = await createServiceClient();
+    const userId = await getCurrentUserId();
 
-    await admin
+    await supabase
       .from("inbox")
       .update({ review_status: "rejected" })
       .eq("id", inboxId);
@@ -114,7 +141,17 @@ export async function rejectReviewAction(
       actionTaken: "classified_only",
     });
 
+    await logAiClassificationFeedback({
+      inboxId,
+      userId: userId ?? inbox.user_id,
+      originalCategory: inbox.ai_category,
+      correctedCategory: inbox.ai_category,
+      originalConfidence: inbox.ai_confidence,
+      feedbackAction: "rejected",
+    });
+
     revalidatePath("/review-queue");
+    revalidatePath("/inbox");
     revalidatePath("/");
 
     return { success: "Email rejected." };
@@ -131,9 +168,107 @@ export async function updateReviewCategoryAction(
   category: AiEmailCategory,
 ): Promise<ReviewActionState> {
   try {
-    await updateInboxAiCategory(inboxId, category);
+    const inbox = await getInboxEmailById(inboxId);
+    const userId = await getCurrentUserId();
+
+    await updateInboxAiCategory(inboxId, category, {
+      recordFeedback: true,
+      userId: userId ?? inbox.user_id,
+    });
+
     revalidatePath("/review-queue");
     revalidatePath("/inbox");
+
+    return { success: "Category updated." };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to update category.",
+    };
+  }
+}
+
+export async function createOpportunityFromInboxAction(
+  inboxId: string,
+  companyName: string,
+): Promise<ReviewActionState> {
+  try {
+    const inbox = await getInboxEmailById(inboxId);
+
+    if (!companyName.trim()) {
+      return { error: "Company name is required." };
+    }
+
+    const classification: AiClassificationResult = {
+      category: inbox.ai_category ?? "new_business_opportunity",
+      confidence: inbox.ai_confidence ?? 0,
+      summary: inbox.ai_summary ?? "",
+      reasoning: inbox.ai_reasoning ?? "",
+      signature: inbox.ai_signature,
+      company_name: companyName.trim(),
+      contact_name: inbox.sender_name,
+      website: inbox.detected_website,
+      estimated_budget: null,
+      requested_deliverables: null,
+    };
+
+    const opportunity = await createOpportunityFromInbox(inbox, classification, {
+      companyName: companyName.trim(),
+    });
+
+    const supabase = await createServiceClient();
+    const userId = await getCurrentUserId();
+
+    await supabase
+      .from("inbox")
+      .update({
+        review_status: "approved",
+        opportunity_id: opportunity.id,
+        detected_company_name: companyName.trim(),
+      })
+      .eq("id", inboxId);
+
+    await logAiClassificationFeedback({
+      inboxId,
+      userId: userId ?? inbox.user_id,
+      originalCategory: inbox.ai_category,
+      correctedCategory: inbox.ai_category,
+      originalConfidence: inbox.ai_confidence,
+      feedbackAction: "manual_created",
+      companyNameOverride: companyName.trim(),
+    });
+
+    revalidatePath("/inbox");
+    revalidatePath("/opportunities");
+    revalidatePath("/review-queue");
+
+    return { success: "Opportunity created." };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to create opportunity.",
+    };
+  }
+}
+
+export async function updateInboxCategoryAction(
+  inboxId: string,
+  category: AiEmailCategory,
+): Promise<ReviewActionState> {
+  try {
+    const inbox = await getInboxEmailById(inboxId);
+    const userId = await getCurrentUserId();
+
+    await updateInboxAiCategory(inboxId, category, {
+      recordFeedback: inbox.ai_category !== category,
+      userId: userId ?? inbox.user_id,
+    });
+
+    revalidatePath(`/inbox/${inboxId}`);
+    revalidatePath("/inbox");
+    revalidatePath("/review-queue");
 
     return { success: "Category updated." };
   } catch (error) {
@@ -163,4 +298,10 @@ export async function retryAiProcessingAction(
           : "Failed to reprocess email.",
     };
   }
+}
+
+export async function approveIfJobEnquiry(
+  category: AiEmailCategory,
+): Promise<boolean> {
+  return isJobEnquiryCategory(category);
 }

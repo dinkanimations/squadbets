@@ -16,9 +16,13 @@ export function AiCategoryBadge({
       ? "success"
       : category === "spam"
         ? "danger"
-        : category === "marketing" || category === "recruitment"
+        : category === "marketing" ||
+            category === "recruitment" ||
+            category === "newsletter"
           ? "warning"
-          : "default";
+          : category === "internal"
+            ? "default"
+            : "default";
 
   return <Badge variant={variant}>{AI_CATEGORY_LABELS[category]}</Badge>;
 }

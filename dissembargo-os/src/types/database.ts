@@ -63,7 +63,9 @@ export type AiEmailCategory =
   | "invoice"
   | "marketing"
   | "recruitment"
+  | "newsletter"
   | "spam"
+  | "internal"
   | "other";
 
 export type InboxReviewStatus =
@@ -257,6 +259,7 @@ export interface Database {
           ai_confidence: number | null;
           opportunity_status: OpportunityStatus;
           estimated_budget: number | null;
+          requested_deliverables: string | null;
           notes: string | null;
           inbox_id: string | null;
           created_at: string;
@@ -272,6 +275,7 @@ export interface Database {
           ai_confidence?: number | null;
           opportunity_status?: OpportunityStatus;
           estimated_budget?: number | null;
+          requested_deliverables?: string | null;
           notes?: string | null;
           inbox_id?: string | null;
           created_at?: string;
@@ -287,6 +291,7 @@ export interface Database {
           ai_confidence?: number | null;
           opportunity_status?: OpportunityStatus;
           estimated_budget?: number | null;
+          requested_deliverables?: string | null;
           notes?: string | null;
           inbox_id?: string | null;
           created_at?: string;
@@ -1319,6 +1324,45 @@ export interface Database {
           prompt_version?: string;
           raw_response?: Json | null;
           action_taken?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      ai_classification_feedback: {
+        Row: {
+          id: string;
+          inbox_id: string;
+          user_id: string;
+          original_category: AiEmailCategory | null;
+          corrected_category: AiEmailCategory | null;
+          original_confidence: number | null;
+          feedback_action: string;
+          company_name_override: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          inbox_id: string;
+          user_id: string;
+          original_category?: AiEmailCategory | null;
+          corrected_category?: AiEmailCategory | null;
+          original_confidence?: number | null;
+          feedback_action: string;
+          company_name_override?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          inbox_id?: string;
+          user_id?: string;
+          original_category?: AiEmailCategory | null;
+          corrected_category?: AiEmailCategory | null;
+          original_confidence?: number | null;
+          feedback_action?: string;
+          company_name_override?: string | null;
+          notes?: string | null;
           created_at?: string;
         };
         Relationships: [];
