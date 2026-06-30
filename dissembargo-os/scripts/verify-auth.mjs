@@ -41,6 +41,59 @@ function loadEnvFile(filePath) {
   }
 }
 
+function normalizeSupabaseUrl(url) {
+  return url.replace(/\/+$/, "");
+}
+
+function projectRefFromUrl(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace(/\.supabase\.co$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function projectRefFromJwt(jwt) {
+  try {
+    const parts = jwt.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf8"),
+    );
+    return typeof payload.ref === "string" ? payload.ref : null;
+  } catch {
+    return null;
+  }
+}
+
+function describeFetchError(error) {
+  if (!(error instanceof Error)) return "request failed";
+
+  const cause = error.cause;
+  if (cause && typeof cause === "object" && "code" in cause) {
+    const code = String(cause.code);
+    const hostname =
+      "hostname" in cause ? String(cause.hostname) : "unknown host";
+
+    if (code === "ENOTFOUND") {
+      return `DNS lookup failed for ${hostname} (hostname does not exist — check NEXT_PUBLIC_SUPABASE_URL for typos)`;
+    }
+
+    if (code === "ECONNREFUSED") {
+      return `Connection refused by ${hostname}`;
+    }
+
+    if (code === "ETIMEDOUT") {
+      return `Connection timed out reaching ${hostname}`;
+    }
+
+    return `${error.message} (${code}: ${hostname})`;
+  }
+
+  return error.message;
+}
+
 loadEnvFile(resolve(process.cwd(), ".env.local"));
 
 const checks = [];
@@ -51,7 +104,9 @@ function record(name, ok, detail) {
   console.log(`${icon} ${name}: ${detail}`);
 }
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
+  : undefined;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -137,24 +192,48 @@ if (!url || !anonKey || urlIsPlaceholder || anonIsPlaceholder) {
   process.exit(1);
 }
 
+const urlRef = projectRefFromUrl(url);
+const jwtRef = projectRefFromJwt(anonKey);
+
+if (urlRef && jwtRef) {
+  record(
+    "URL matches anon key project ref",
+    urlRef === jwtRef,
+    urlRef === jwtRef
+      ? `${urlRef}`
+      : `URL ref "${urlRef}" does not match anon key ref "${jwtRef}" — copy Project URL from Supabase Dashboard → Project Settings → API`,
+  );
+}
+
+const healthUrl = `${url}/auth/v1/health`;
+console.log(`\nReachability test URL: ${healthUrl}`);
+
 let healthOk = false;
 
 try {
-  const response = await fetch(`${url}/auth/v1/health`, {
+  const response = await fetch(healthUrl, {
+    method: "GET",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+    },
     signal: AbortSignal.timeout(10000),
   });
+
   healthOk = response.ok;
-  record(
-    "Supabase reachability",
-    healthOk,
-    healthOk ? `HTTP ${response.status}` : `HTTP ${response.status}`,
-  );
+
+  if (healthOk) {
+    record("Supabase reachability", true, `HTTP ${response.status} — GoTrue auth API is online`);
+  } else {
+    const body = await response.text();
+    record(
+      "Supabase reachability",
+      false,
+      `HTTP ${response.status} — ${body.slice(0, 160)}`,
+    );
+  }
 } catch (error) {
-  record(
-    "Supabase reachability",
-    false,
-    error instanceof Error ? error.message : "request failed",
-  );
+  record("Supabase reachability", false, describeFetchError(error));
 }
 
 if (healthOk) {
