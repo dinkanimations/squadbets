@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   ProductionSchedule,
   ProductionScheduleInsert,
@@ -13,6 +12,7 @@ import type { ScheduleData } from "@/lib/production-schedules/constants";
 import {
   getPaginationRange,
   handleDatabaseError,
+  withDevDbFallback,
   type PaginationOptions,
 } from "./utils";
 
@@ -31,39 +31,41 @@ export async function getSchedulesFiltered(
   filters: SchedulesFilter = {},
   options?: PaginationOptions,
 ) {
-  const supabase = await createClient();
-  const { from, to } = getPaginationRange(options ?? { pageSize: 50 });
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
+    const { from, to } = getPaginationRange(options ?? { pageSize: 50 });
 
-  let query = supabase
-    .from("production_schedules")
-    .select(
-      `
+    let query = supabase
+      .from("production_schedules")
+      .select(
+        `
       *,
       company:companies (id, company_name),
       opportunity:opportunities (id, subject),
       quote:quotes (id, quote_number),
       project:projects (id, project_name)
     `,
-      { count: "exact" },
-    )
-    .neq("status", "archived")
-    .order("created_at", { ascending: false })
-    .range(from, to);
+        { count: "exact" },
+      )
+      .neq("status", "archived")
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-  if (filters.status) {
-    query = query.eq("status", filters.status);
-  }
+    if (filters.status) {
+      query = query.eq("status", filters.status);
+    }
 
-  if (filters.search?.trim()) {
-    const term = `%${filters.search.trim()}%`;
-    query = query.ilike("project_title", term);
-  }
+    if (filters.search?.trim()) {
+      const term = `%${filters.search.trim()}%`;
+      query = query.ilike("project_title", term);
+    }
 
-  const { data, error, count } = await query;
+    const { data, error, count } = await query;
 
-  if (error) handleDatabaseError(error, "Failed to fetch schedules");
+    if (error) handleDatabaseError(error, "Failed to fetch schedules");
 
-  return { data: data as ScheduleWithRelations[], count: count ?? 0 };
+    return { data: data as ScheduleWithRelations[], count: count ?? 0 };
+  }, { data: [], count: 0 });
 }
 
 export async function getScheduleFullById(id: string): Promise<ScheduleFull> {
@@ -136,9 +138,9 @@ export async function saveScheduleVersion(
   scheduleData: ScheduleData,
   changeNote?: string,
 ) {
-  const admin = createAdminClient();
+  const supabase = await createClient();
 
-  const { error } = await admin.from("production_schedule_versions").insert({
+  const { error } = await supabase.from("production_schedule_versions").insert({
     schedule_id: scheduleId,
     version,
     schedule_json: scheduleData as unknown as ProductionScheduleInsert["schedule_json"],
@@ -151,79 +153,85 @@ export async function saveScheduleVersion(
 }
 
 export async function countSchedulesInProduction(): Promise<number> {
-  const supabase = await createClient();
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
 
-  const { count, error } = await supabase
-    .from("production_schedules")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active");
+    const { count, error } = await supabase
+      .from("production_schedules")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active");
 
-  if (error) handleDatabaseError(error, "Failed to count schedules");
+    if (error) handleDatabaseError(error, "Failed to count schedules");
 
-  return count ?? 0;
+    return count ?? 0;
+  }, 0);
 }
 
 export async function getUpcomingMilestones(limit = 5) {
-  const supabase = await createClient();
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("production_schedules")
-    .select("id, project_title, schedule_json, delivery_date")
-    .eq("status", "active")
-    .order("delivery_date", { ascending: true });
+    const { data, error } = await supabase
+      .from("production_schedules")
+      .select("id, project_title, schedule_json, delivery_date")
+      .eq("status", "active")
+      .order("delivery_date", { ascending: true });
 
-  if (error) handleDatabaseError(error, "Failed to fetch milestones");
+    if (error) handleDatabaseError(error, "Failed to fetch milestones");
 
-  const today = new Date().toISOString().split("T")[0];
-  const items: Array<{
-    scheduleId: string;
-    projectTitle: string;
-    milestoneLabel: string;
-    milestoneType: string;
-    date: string;
-  }> = [];
+    const today = new Date().toISOString().split("T")[0];
+    const items: Array<{
+      scheduleId: string;
+      projectTitle: string;
+      milestoneLabel: string;
+      milestoneType: string;
+      date: string;
+    }> = [];
 
-  for (const schedule of data ?? []) {
-    const scheduleData = parseScheduleData(schedule.schedule_json);
-    for (const milestone of scheduleData.milestones) {
-      if (milestone.date >= today) {
-        items.push({
-          scheduleId: schedule.id,
-          projectTitle: schedule.project_title,
-          milestoneLabel: milestone.label,
-          milestoneType: milestone.type,
-          date: milestone.date,
-        });
+    for (const schedule of data ?? []) {
+      const scheduleData = parseScheduleData(schedule.schedule_json);
+      for (const milestone of scheduleData.milestones) {
+        if (milestone.date >= today) {
+          items.push({
+            scheduleId: schedule.id,
+            projectTitle: schedule.project_title,
+            milestoneLabel: milestone.label,
+            milestoneType: milestone.type,
+            date: milestone.date,
+          });
+        }
       }
     }
-  }
 
-  return items
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, limit);
+    return items
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, limit);
+  }, []);
 }
 
 export async function getDeliveryDeadlines(limit = 5) {
-  const supabase = await createClient();
-  const today = new Date().toISOString().split("T")[0];
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
+    const today = new Date().toISOString().split("T")[0];
 
-  const { data, error } = await supabase
-    .from("production_schedules")
-    .select("id, project_title, delivery_date, company:companies(company_name)")
-    .eq("status", "active")
-    .gte("delivery_date", today)
-    .order("delivery_date", { ascending: true })
-    .limit(limit);
+    const { data, error } = await supabase
+      .from("production_schedules")
+      .select("id, project_title, delivery_date, company:companies(company_name)")
+      .eq("status", "active")
+      .gte("delivery_date", today)
+      .order("delivery_date", { ascending: true })
+      .limit(limit);
 
-  if (error) handleDatabaseError(error, "Failed to fetch delivery deadlines");
+    if (error) handleDatabaseError(error, "Failed to fetch delivery deadlines");
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    projectTitle: row.project_title,
-    deliveryDate: row.delivery_date as string,
-    companyName:
-      (row.company as { company_name: string } | null)?.company_name ?? "—",
-  }));
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      projectTitle: row.project_title,
+      deliveryDate: row.delivery_date as string,
+      companyName:
+        (row.company as { company_name: string } | null)?.company_name ?? "—",
+    }));
+  }, []);
 }
 
 export async function getProductionSchedulesByProjectId(projectId: string) {
