@@ -13,11 +13,14 @@ import {
   BACKFILL_BATCH_SIZE,
   SYNC_AI_PROCESS_LIMIT,
   SYNC_HISTORICAL_IMPORT_LIMIT,
+  SYNC_RESCAN_FAILED_LIMIT,
 } from "./constants";
 import {
   processPendingInboxEmails,
   backfillPotentialOpportunities,
+  rescanFailedInboxEmails,
 } from "@/lib/ai/process-inbox";
+import { getFailedInboxCountForUser } from "@/lib/database/inbox-stats";
 
 export type SyncResult = {
   imported: number;
@@ -264,7 +267,10 @@ async function importMissingHistoricalMessages(
   }
 }
 
-async function runInboxIntelligencePipeline(userId: string): Promise<{
+async function runInboxIntelligencePipeline(
+  userId: string,
+  options?: { failedCount?: number },
+): Promise<{
   backfillProcessed: number;
   potentialOpportunitiesFound: number;
   aiProcessed: number;
@@ -273,9 +279,17 @@ async function runInboxIntelligencePipeline(userId: string): Promise<{
   let aiProcessed = 0;
   let backfillProcessed = 0;
   let potentialOpportunitiesFound = 0;
+  let warning: string | undefined;
 
   try {
-    const pending = await processPendingInboxEmails(SYNC_AI_PROCESS_LIMIT);
+    const pending =
+      (options?.failedCount ?? 0) > 0
+        ? await rescanFailedInboxEmails({
+            userId,
+            limit: SYNC_RESCAN_FAILED_LIMIT,
+          })
+        : await processPendingInboxEmails(SYNC_AI_PROCESS_LIMIT, { userId });
+
     aiProcessed = pending.length;
     potentialOpportunitiesFound = pending.filter(
       (result) =>
@@ -299,18 +313,14 @@ async function runInboxIntelligencePipeline(userId: string): Promise<{
     backfillProcessed = backfill.processed;
     potentialOpportunitiesFound += backfill.potentialOpportunities;
   } catch (error) {
-    return {
-      aiProcessed,
-      backfillProcessed,
-      potentialOpportunitiesFound,
-      warning: `Email rescan skipped: ${formatSyncError(error)}`,
-    };
+    warning = `Email rescan skipped: ${formatSyncError(error)}`;
   }
 
   return {
     aiProcessed,
     backfillProcessed,
     potentialOpportunitiesFound,
+    warning,
   };
 }
 
@@ -357,7 +367,10 @@ export async function syncGmailConnection(
     }
 
     if (!options?.skipIntelligencePipeline) {
-      const pipeline = await runInboxIntelligencePipeline(connection.user_id);
+      const failedCount = await getFailedInboxCountForUser(connection.user_id);
+      const pipeline = await runInboxIntelligencePipeline(connection.user_id, {
+        failedCount,
+      });
       backfillProcessed = pipeline.backfillProcessed;
       potentialOpportunitiesFound = pipeline.potentialOpportunitiesFound;
       aiProcessed = pipeline.aiProcessed;
@@ -430,7 +443,8 @@ export async function syncUserGmailConnections(userId: string) {
   }
 
   if (connections.length > 0) {
-    const pipeline = await runInboxIntelligencePipeline(userId);
+    const failedCount = await getFailedInboxCountForUser(userId);
+    const pipeline = await runInboxIntelligencePipeline(userId, { failedCount });
 
     const last = results[results.length - 1];
     if (last) {

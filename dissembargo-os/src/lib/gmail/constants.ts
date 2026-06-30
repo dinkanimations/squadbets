@@ -14,7 +14,10 @@ export const HISTORICAL_IMPORT_BATCH_SIZE = 200;
 export const SYNC_HISTORICAL_IMPORT_LIMIT = 40;
 
 /** How many emails to run through OpenAI per sync click. */
-export const SYNC_AI_PROCESS_LIMIT = 8;
+export const SYNC_AI_PROCESS_LIMIT = 15;
+
+/** How many failed emails to reset and rescan when backlog detected. */
+export const SYNC_RESCAN_FAILED_LIMIT = 20;
 
 /** How many previously imported emails to reprocess per sync for potential opportunities. */
 export const BACKFILL_BATCH_SIZE = 10;

@@ -184,25 +184,63 @@ export async function processInboxEmail(
   }
 }
 
-export async function processPendingInboxEmails(limit = 20) {
+export async function processPendingInboxEmails(
+  limit = 20,
+  options?: { userId?: string },
+) {
   const supabase = await createServiceClient();
 
-  const { data: pendingEmails, error } = await supabase
+  let query = supabase
     .from("inbox")
-    .select("id")
+    .select("id, ai_processing_status")
     .in("ai_processing_status", ["pending", "failed"])
     .order("imported_at", { ascending: true })
     .limit(limit);
+
+  if (options?.userId) {
+    query = query.eq("user_id", options.userId);
+  }
+
+  const { data: pendingEmails, error } = await query;
 
   if (error) throw error;
 
   const results = [];
 
   for (const email of pendingEmails ?? []) {
-    results.push(await processInboxEmail(email.id));
+    const result =
+      email.ai_processing_status === "failed"
+        ? await reprocessInboxEmail(email.id)
+        : await processInboxEmail(email.id);
+    results.push(result);
   }
 
   return results;
+}
+
+/** Reset failed AI scans and reprocess emails (e.g. after fixing OpenAI key or migrations). */
+export async function rescanFailedInboxEmails(options?: {
+  userId?: string;
+  limit?: number;
+}) {
+  const supabase = await createServiceClient();
+  const limit = options?.limit ?? 25;
+
+  let resetQuery = supabase
+    .from("inbox")
+    .update({
+      ai_processing_status: "pending",
+      ai_processing_error: null,
+    })
+    .eq("ai_processing_status", "failed");
+
+  if (options?.userId) {
+    resetQuery = resetQuery.eq("user_id", options.userId);
+  }
+
+  await resetQuery;
+
+  return processPendingInboxEmails(limit, { userId: options?.userId });
 }
 
 export async function backfillPotentialOpportunities(options?: {
@@ -261,7 +299,9 @@ export async function backfillPotentialOpportunities(options?: {
       const result =
         row.ai_processing_status === "completed"
           ? await reprocessInboxEmail(row.id)
-          : await processInboxEmail(row.id);
+          : row.ai_processing_status === "failed"
+            ? await reprocessInboxEmail(row.id)
+            : await processInboxEmail(row.id);
 
       results.push(result);
 

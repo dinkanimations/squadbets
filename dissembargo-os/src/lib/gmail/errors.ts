@@ -68,7 +68,9 @@ export function formatGmailSyncResult(data: {
       `found ${potentialOpportunitiesFound} potential opportunit${potentialOpportunitiesFound === 1 ? "y" : "ies"}`,
     );
   } else if (aiProcessed > 0) {
-    parts.push(`processed ${aiProcessed} email${aiProcessed === 1 ? "" : "s"} with AI`);
+    parts.push(
+      `scanned ${aiProcessed} email${aiProcessed === 1 ? "" : "s"} with AI (no business leads in this batch)`,
+    );
   } else if (backfillProcessed > 0) {
     parts.push(`rescanned ${backfillProcessed} older email${backfillProcessed === 1 ? "" : "s"}`);
   }

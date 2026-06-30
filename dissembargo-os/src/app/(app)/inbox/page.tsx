@@ -6,8 +6,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { InboxSetupBanner } from "@/components/setup/InboxSetupBanner";
 import { getPendingPotentialOpportunities } from "@/lib/database/potential-opportunities";
 import { getInboxSchemaHealth } from "@/lib/database/inbox-schema-health";
+import { getInboxProcessingStats } from "@/lib/database/inbox-stats";
 import { getUserGmailConnections } from "@/lib/database/gmail-connections";
 import { Button } from "@/components/ui/Button";
+import { InboxRescanButton } from "@/components/inbox/InboxRescanButton";
 import Link from "next/link";
 import InboxLoading from "./loading";
 
@@ -27,18 +29,22 @@ async function InboxContent() {
   let connection = null;
   let inboxSchemaReady = true;
   let inboxProjectRef: string | null = null;
+  let processingStats: Awaited<ReturnType<typeof getInboxProcessingStats>> | null =
+    null;
 
   try {
-    const [potentialResult, connections, inboxSchema] = await Promise.all([
+    const [potentialResult, connections, inboxSchema, stats] = await Promise.all([
       getPendingPotentialOpportunities(),
       getUserGmailConnections(),
       getInboxSchemaHealth(),
+      getInboxProcessingStats(),
     ]);
 
     opportunities = potentialResult.data;
     connection = connections.length > 0 ? connections[0] : null;
     inboxSchemaReady = inboxSchema.ready;
     inboxProjectRef = inboxSchema.projectRef;
+    processingStats = stats;
   } catch (err) {
     error =
       err instanceof Error
@@ -73,18 +79,60 @@ async function InboxContent() {
           }
         />
       ) : opportunities.length === 0 ? (
-        <EmptyState
-          title="Inbox clear"
-          description="Sync Gmail to scan your mailbox. Dissembargo surfaces new business enquiries and client replies — newsletters, invoices, spam, and notifications are ignored."
-          action={
-            <Link href="/settings/integrations">
-              <Button>Sync Gmail</Button>
-            </Link>
-          }
-        />
+        <InboxEmptyState stats={processingStats} />
       ) : (
         <PotentialOpportunityList opportunities={opportunities} />
       )}
     </>
+  );
+}
+
+function InboxEmptyState({
+  stats,
+}: {
+  stats: Awaited<ReturnType<typeof getInboxProcessingStats>> | null;
+}) {
+  const needsScan = (stats?.failed ?? 0) + (stats?.pending ?? 0);
+  const scannedCount = stats?.completed ?? 0;
+
+  if (stats && stats.totalImported > 0 && needsScan > 0) {
+    return (
+      <EmptyState
+        title="Emails imported — scan needed"
+        description={`${stats.totalImported} email${stats.totalImported === 1 ? "" : "s"} imported from Gmail, but ${needsScan} still need AI scanning before leads can appear. This usually happens when OpenAI wasn't configured during the first sync.`}
+        action={
+          <InboxRescanButton pendingCount={needsScan} />
+        }
+      />
+    );
+  }
+
+  if (stats && stats.totalImported > 0 && scannedCount > 0) {
+    return (
+      <EmptyState
+        title="Inbox clear"
+        description={`${scannedCount} email${scannedCount === 1 ? "" : "s"} scanned — no business enquiries or client replies need action right now. Newsletters, invoices, spam, and notifications are intentionally hidden.`}
+        action={
+          <div className="flex flex-col items-center gap-3 sm:flex-row">
+            <InboxRescanButton label="Rescan mailbox" />
+            <Link href="/settings/integrations">
+              <Button variant="secondary">Sync Gmail</Button>
+            </Link>
+          </div>
+        }
+      />
+    );
+  }
+
+  return (
+    <EmptyState
+      title="Inbox clear"
+      description="Sync Gmail to scan your mailbox. Dissembargo surfaces new business enquiries and client replies — newsletters, invoices, spam, and notifications are ignored."
+      action={
+        <Link href="/settings/integrations">
+          <Button>Sync Gmail</Button>
+        </Link>
+      }
+    />
   );
 }
