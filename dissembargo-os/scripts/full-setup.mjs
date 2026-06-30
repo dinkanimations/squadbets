@@ -114,6 +114,12 @@ if (accessToken && dbPassword && projectRef) {
     "--linked",
     "--yes",
   ], { SUPABASE_ACCESS_TOKEN: accessToken });
+} else if (dbPassword && projectRef) {
+  console.log(`
+ℹ Skipping supabase db push — no SUPABASE_ACCESS_TOKEN.
+   Trying direct Postgres migration apply instead…
+`);
+  run("Apply database migrations (Postgres)", "node", ["scripts/apply-migrations-pg.mjs"]);
 } else {
   console.log(`
 ℹ Skipping supabase db push — add these Cursor Secrets to apply migrations automatically:
