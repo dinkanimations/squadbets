@@ -63,15 +63,22 @@ export function InboxSetupBanner({ projectRef }: InboxSetupBannerProps) {
                 href={sqlEditorUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-accent underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline"
               >
-                Supabase SQL Editor
+                Supabase SQL Editor (new tab)
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
+              {" "}— paste with Ctrl+V (or Cmd+V), then click the green <strong>Run</strong> button
             </li>
-            <li>Paste the SQL and click Run</li>
-            <li>Return here and click Sync Gmail again</li>
+            <li>Wait for &quot;Success&quot; at the bottom of the SQL Editor</li>
+            <li>Refresh this page, then click <strong>Sync Gmail</strong> again</li>
           </ol>
+
+          <p className="text-xs text-muted">
+            Or add <code className="rounded bg-surface px-1">SUPABASE_DB_PASSWORD</code> to{" "}
+            <code className="rounded bg-surface px-1">.env.local</code> and run{" "}
+            <code className="rounded bg-surface px-1">npm run db:inbox:apply</code> in the terminal.
+          </p>
 
           <details className="rounded-lg border border-border bg-surface/60">
             <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted">

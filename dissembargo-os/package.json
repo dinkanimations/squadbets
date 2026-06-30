@@ -16,6 +16,7 @@
     "db:push": "supabase db push",
     "db:bundle": "node scripts/bundle-migrations.mjs",
     "db:inbox": "node -e \"console.log('Open supabase/paste-inbox-migrations.sql — copy all → Supabase SQL Editor → Run')\"",
+    "db:inbox:apply": "node scripts/apply-inbox-migration.mjs",
     "db:types": "supabase gen types typescript --local > src/types/database.generated.ts"
   },
   "dependencies": {
