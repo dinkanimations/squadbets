@@ -190,6 +190,9 @@ export function CompanyDetailClient({ profile }: CompanyDetailClientProps) {
             {company.industry && <span>{company.industry}</span>}
             {company.headquarters && <span>{company.headquarters}</span>}
             {company.estimated_size && <span>{company.estimated_size} employees</span>}
+            {company.last_contact_at && (
+              <span>Last contact {formatCompanyDate(company.last_contact_at)}</span>
+            )}
             {company.website && (
               <a
                 href={company.website}
@@ -464,6 +467,11 @@ export function CompanyDetailClient({ profile }: CompanyDetailClientProps) {
                   <li key={item.id} className="rounded-lg border border-border p-3 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{item.status}</Badge>
+                      <Badge variant="default">
+                        {item.item_type === "client_communication"
+                          ? "Client reply"
+                          : "New enquiry"}
+                      </Badge>
                       <span className="text-xs text-muted">
                         {item.inbox?.date_received
                           ? formatCompanyDate(item.inbox.date_received)

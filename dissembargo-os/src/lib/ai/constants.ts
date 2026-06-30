@@ -3,10 +3,14 @@ export const AI_EMAIL_CATEGORIES = [
   "existing_client",
   "supplier",
   "invoice",
+  "receipt",
   "recruitment",
   "marketing",
   "newsletter",
   "spam",
+  "password_reset",
+  "calendar",
+  "social_notification",
   "internal",
   "other",
 ] as const;
@@ -18,27 +22,57 @@ export const AI_CATEGORY_LABELS: Record<AiEmailCategory, string> = {
   existing_client: "Existing Client",
   supplier: "Supplier",
   invoice: "Invoice",
+  receipt: "Receipt",
   recruitment: "Recruitment",
   marketing: "Marketing",
   newsletter: "Newsletter",
   spam: "Spam",
+  password_reset: "Password Reset",
+  calendar: "Calendar",
+  social_notification: "Social",
   internal: "Internal",
   other: "Other",
 };
 
 export const JOB_ENQUIRY_CATEGORY: AiEmailCategory = "new_business_opportunity";
+export const EXISTING_CLIENT_CATEGORY: AiEmailCategory = "existing_client";
+
+/** Categories that should never appear in the Inbox — left in Gmail only. */
+export const IGNORED_EMAIL_CATEGORIES: AiEmailCategory[] = [
+  "supplier",
+  "invoice",
+  "receipt",
+  "recruitment",
+  "marketing",
+  "newsletter",
+  "spam",
+  "password_reset",
+  "calendar",
+  "social_notification",
+  "internal",
+  "other",
+];
 
 export const AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD = 90;
 
-/** Minimum confidence to surface an email as a Potential Opportunity in Inbox. */
+/** Minimum confidence to surface a new business enquiry in Inbox. */
 export const POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE = 50;
+
+/** Minimum confidence to surface an existing-client communication in Inbox. */
+export const CLIENT_COMMUNICATION_MIN_CONFIDENCE = 40;
 
 export const OPENAI_MODEL = "gpt-4o-mini";
 
-export const PROMPT_VERSION = "v3";
+export const PROMPT_VERSION = "v4";
+
+export type InboxRoutingIntent =
+  | "new_business_enquiry"
+  | "existing_client_communication"
+  | "not_relevant";
 
 export type AiClassificationResult = {
   category: AiEmailCategory;
+  routing_intent: InboxRoutingIntent;
   confidence: number;
   summary: string;
   reasoning: string;
@@ -59,6 +93,7 @@ export type AiClassificationResult = {
 export type AiActionTaken =
   | "auto_opportunity"
   | "potential_opportunity"
+  | "client_communication"
   | "ignored"
   | "review_queue"
   | "classified_only"
@@ -100,6 +135,28 @@ export function isJobEnquiryCategory(
   return category === JOB_ENQUIRY_CATEGORY;
 }
 
+export function isExistingClientCategory(
+  category: AiEmailCategory | null | undefined,
+): boolean {
+  return category === EXISTING_CLIENT_CATEGORY;
+}
+
+export function isIgnoredEmailCategory(
+  category: AiEmailCategory | null | undefined,
+): boolean {
+  return category ? IGNORED_EMAIL_CATEGORIES.includes(category) : true;
+}
+
+export function routingIntentFromCategory(
+  category: AiEmailCategory,
+): InboxRoutingIntent {
+  if (category === JOB_ENQUIRY_CATEGORY) return "new_business_enquiry";
+  if (category === EXISTING_CLIENT_CATEGORY) {
+    return "existing_client_communication";
+  }
+  return "not_relevant";
+}
+
 export function classificationFromInboxFields(
   inbox: {
     ai_category?: AiEmailCategory | null;
@@ -121,6 +178,8 @@ export function classificationFromInboxFields(
 
   return {
     category,
+    routing_intent:
+      overrides.routing_intent ?? routingIntentFromCategory(category),
     confidence: overrides.confidence ?? inbox.ai_confidence ?? 0,
     summary: overrides.summary ?? inbox.ai_summary ?? "",
     reasoning: overrides.reasoning ?? inbox.ai_reasoning ?? "",

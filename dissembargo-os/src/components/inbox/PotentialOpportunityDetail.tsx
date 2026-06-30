@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader } from "@/components/ui/Card";
 import type { PotentialOpportunityWithInbox } from "@/types/potential-opportunity";
 import type { Company } from "@/types/database";
+import { isClientCommunicationItem } from "@/types/potential-opportunity";
 import {
   acceptPotentialOpportunityAction,
   dismissPotentialOpportunityAction,
@@ -100,8 +101,49 @@ export function PotentialOpportunityDetail({
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Badge variant="success">{Math.round(potential.ai_confidence)}% confidence</Badge>
+          {isClientCommunicationItem(potential) ? (
+            <Badge>Client communication</Badge>
+          ) : (
+            <Badge variant="success">New business enquiry</Badge>
+          )}
           <Badge>{formatDateTime(potential.inbox.date_received)}</Badge>
         </div>
+
+        {(potential.linked_opportunity_id ||
+          potential.linked_quote_id ||
+          potential.linked_project_id) && (
+          <div className="mb-4 rounded-lg border border-border bg-surface-elevated/40 p-3 text-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              Auto-linked to
+            </p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              {potential.linked_opportunity_id && (
+                <Link
+                  href={`/opportunities/${potential.linked_opportunity_id}`}
+                  className="text-accent hover:underline"
+                >
+                  Opportunity
+                </Link>
+              )}
+              {potential.linked_quote_id && (
+                <Link
+                  href={`/quotes/${potential.linked_quote_id}`}
+                  className="text-accent hover:underline"
+                >
+                  Quote
+                </Link>
+              )}
+              {potential.linked_project_id && (
+                <Link
+                  href={`/projects/${potential.linked_project_id}`}
+                  className="text-accent hover:underline"
+                >
+                  Project
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4 text-sm">
           <div>
@@ -200,7 +242,9 @@ export function PotentialOpportunityDetail({
             }
           >
             <Check className="h-4 w-4" />
-            Accept Opportunity
+            {isClientCommunicationItem(potential)
+              ? "Create Opportunity"
+              : "Accept Opportunity"}
           </Button>
           <Button
             variant="secondary"

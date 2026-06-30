@@ -5,9 +5,13 @@ export type CompanyWithRelations = Company;
 export type CompanyEmailHistoryItem = {
   id: string;
   status: string;
+  item_type: string;
   ai_summary: string;
   ai_confidence: number;
   created_at: string;
+  linked_opportunity_id: string | null;
+  linked_quote_id: string | null;
+  linked_project_id: string | null;
   inbox: {
     id: string;
     subject: string | null;

@@ -1,9 +1,12 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type { InboxEmail } from "@/types/database";
 import { classifyEmail } from "./classify-email";
-import { createPotentialOpportunityFromInbox } from "./create-potential-opportunity";
 import {
-  isJobEnquiryCategory,
+  createClientCommunicationFromInbox,
+  createPotentialOpportunityFromInbox,
+} from "./create-potential-opportunity";
+import {
+  CLIENT_COMMUNICATION_MIN_CONFIDENCE,
   POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE,
   type AiActionTaken,
   type AiEmailCategory,
@@ -102,20 +105,26 @@ export async function processInboxEmail(
       | "ignored"
       | null = "ignored";
 
-    const isPotentialJob =
-      isJobEnquiryCategory(result.category) &&
+    const isNewBusiness =
+      result.routing_intent === "new_business_enquiry" &&
       result.confidence >= POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE;
 
-    if (isPotentialJob) {
+    const isClientCommunication =
+      result.routing_intent === "existing_client_communication" &&
+      result.confidence >= CLIENT_COMMUNICATION_MIN_CONFIDENCE;
+
+    if (isNewBusiness) {
       await createPotentialOpportunityFromInbox(inbox, result);
       actionTaken = "potential_opportunity";
       reviewStatus = "pending_review";
-    } else if (isJobEnquiryCategory(result.category)) {
-      reviewStatus = "ignored";
-      actionTaken = "classified_only";
+    } else if (isClientCommunication) {
+      await createClientCommunicationFromInbox(inbox, result);
+      actionTaken = "client_communication";
+      reviewStatus = "pending_review";
     } else {
       reviewStatus = "ignored";
-      actionTaken = "ignored";
+      actionTaken =
+        result.routing_intent === "not_relevant" ? "ignored" : "classified_only";
     }
 
     await supabase
@@ -196,10 +205,6 @@ export async function processPendingInboxEmails(limit = 20) {
   return results;
 }
 
-/**
- * Reprocess previously imported emails that were classified before the
- * Potential Opportunity workflow existed (or never staged as leads).
- */
 export async function backfillPotentialOpportunities(options?: {
   userId?: string;
   limit?: number;
@@ -262,7 +267,10 @@ export async function backfillPotentialOpportunities(options?: {
 
       if (result.status === "failed") {
         failed += 1;
-      } else if (result.actionTaken === "potential_opportunity") {
+      } else if (
+        result.actionTaken === "potential_opportunity" ||
+        result.actionTaken === "client_communication"
+      ) {
         potentialOpportunities += 1;
       }
     } catch (error) {
@@ -298,6 +306,9 @@ export async function reprocessInboxEmail(inboxId: string) {
       ai_processing_error: null,
       review_status: null,
       opportunity_id: null,
+      company_id: null,
+      linked_quote_id: null,
+      linked_project_id: null,
     })
     .eq("id", inboxId);
 
@@ -324,7 +335,10 @@ export async function updateInboxAiCategory(
     | "ignored"
     | null = "ignored";
 
-  if (isJobEnquiryCategory(category)) {
+  if (
+    category === "new_business_opportunity" ||
+    category === "existing_client"
+  ) {
     reviewStatus = "pending_review";
   }
 

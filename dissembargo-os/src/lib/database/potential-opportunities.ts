@@ -148,9 +148,13 @@ export async function getCompanyInboxEmails(companyId: string) {
         `
         id,
         status,
+        item_type,
         ai_summary,
         ai_confidence,
         created_at,
+        linked_opportunity_id,
+        linked_quote_id,
+        linked_project_id,
         inbox:inbox!potential_opportunities_inbox_id_fkey (
           id,
           subject,

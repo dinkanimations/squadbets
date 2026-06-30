@@ -43,7 +43,7 @@ async function InboxContent() {
     <>
       <PageHeader
         title="Inbox"
-        description="Your business development assistant — only genuine potential job enquiries appear here. Everything else stays in Gmail."
+        description="Your AI business development assistant — only genuine opportunities and client communications that need action appear here. Everything else stays in Gmail."
         icon={Sparkles}
       />
 
@@ -63,8 +63,8 @@ async function InboxContent() {
         />
       ) : opportunities.length === 0 ? (
         <EmptyState
-          title="No potential opportunities"
-          description="Sync Gmail from Integrations. The AI scans new and older emails each sync — genuine job enquiries appear here as potential opportunities."
+          title="Inbox clear"
+          description="Sync Gmail to scan your mailbox. Dissembargo surfaces new business enquiries and client replies — newsletters, invoices, spam, and notifications are ignored."
           action={
             <Link href="/settings/integrations">
               <Button>Sync Gmail</Button>

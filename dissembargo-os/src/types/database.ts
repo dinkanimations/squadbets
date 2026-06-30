@@ -61,12 +61,18 @@ export type AiEmailCategory =
   | "existing_client"
   | "supplier"
   | "invoice"
+  | "receipt"
   | "marketing"
   | "recruitment"
   | "newsletter"
   | "spam"
+  | "password_reset"
+  | "calendar"
+  | "social_notification"
   | "internal"
   | "other";
+
+export type InboxItemType = "new_opportunity" | "client_communication";
 
 export type InboxReviewStatus =
   | "pending_review"
@@ -145,6 +151,7 @@ export interface Database {
           normalized_name: string | null;
           website_domain: string | null;
           manual_overrides: Json;
+          last_contact_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -174,6 +181,7 @@ export interface Database {
           normalized_name?: string | null;
           website_domain?: string | null;
           manual_overrides?: Json;
+          last_contact_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -203,6 +211,7 @@ export interface Database {
           normalized_name?: string | null;
           website_domain?: string | null;
           manual_overrides?: Json;
+          last_contact_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1225,6 +1234,9 @@ export interface Database {
           ai_processing_error: string | null;
           review_status: InboxReviewStatus | null;
           opportunity_id: string | null;
+          company_id: string | null;
+          linked_quote_id: string | null;
+          linked_project_id: string | null;
           detected_company_name: string | null;
           detected_website: string | null;
         };
@@ -1255,6 +1267,9 @@ export interface Database {
           ai_processing_error?: string | null;
           review_status?: InboxReviewStatus | null;
           opportunity_id?: string | null;
+          company_id?: string | null;
+          linked_quote_id?: string | null;
+          linked_project_id?: string | null;
           detected_company_name?: string | null;
           detected_website?: string | null;
         };
@@ -1285,10 +1300,21 @@ export interface Database {
           ai_processing_error?: string | null;
           review_status?: InboxReviewStatus | null;
           opportunity_id?: string | null;
+          company_id?: string | null;
+          linked_quote_id?: string | null;
+          linked_project_id?: string | null;
           detected_company_name?: string | null;
           detected_website?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "inbox_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       potential_opportunities: {
         Row: {
@@ -1299,6 +1325,7 @@ export interface Database {
           contact_id: string | null;
           opportunity_id: string | null;
           status: "pending" | "accepted" | "dismissed";
+          item_type: InboxItemType;
           company_name: string;
           contact_name: string | null;
           contact_email: string | null;
@@ -1314,6 +1341,9 @@ export interface Database {
           ai_confidence: number;
           ai_reasoning: string | null;
           extraction_json: Json;
+          linked_opportunity_id: string | null;
+          linked_quote_id: string | null;
+          linked_project_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -1325,6 +1355,7 @@ export interface Database {
           contact_id?: string | null;
           opportunity_id?: string | null;
           status?: "pending" | "accepted" | "dismissed";
+          item_type?: InboxItemType;
           company_name: string;
           contact_name?: string | null;
           contact_email?: string | null;
@@ -1340,6 +1371,9 @@ export interface Database {
           ai_confidence: number;
           ai_reasoning?: string | null;
           extraction_json?: Json;
+          linked_opportunity_id?: string | null;
+          linked_quote_id?: string | null;
+          linked_project_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1351,6 +1385,7 @@ export interface Database {
           contact_id?: string | null;
           opportunity_id?: string | null;
           status?: "pending" | "accepted" | "dismissed";
+          item_type?: InboxItemType;
           company_name?: string;
           contact_name?: string | null;
           contact_email?: string | null;
@@ -1366,6 +1401,9 @@ export interface Database {
           ai_confidence?: number;
           ai_reasoning?: string | null;
           extraction_json?: Json;
+          linked_opportunity_id?: string | null;
+          linked_quote_id?: string | null;
+          linked_project_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

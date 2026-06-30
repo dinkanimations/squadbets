@@ -44,9 +44,16 @@ export async function acceptPotentialOpportunityAction(
     const inbox = await getInboxEmailById(potential.inbox_id);
     const classification = classificationFromPotential(potential, inbox);
 
+    const categoryLabel =
+      potential.item_type === "client_communication"
+        ? AI_CATEGORY_LABELS.existing_client
+        : AI_CATEGORY_LABELS.new_business_opportunity;
+
     const opportunity = await createOpportunityFromInbox(inbox, classification, {
+      companyId: potential.company_id ?? undefined,
+      contactId: potential.contact_id ?? undefined,
       companyName: potential.company_name,
-      category: AI_CATEGORY_LABELS.new_business_opportunity,
+      category: categoryLabel,
       estimatedBudget: potential.estimated_budget,
       requestedDeliverables: potential.deliverables,
     });
@@ -64,14 +71,21 @@ export async function acceptPotentialOpportunityAction(
       .update({
         review_status: "approved",
         opportunity_id: opportunity.id,
+        company_id: potential.company_id,
       })
       .eq("id", potential.inbox_id);
 
     await logAiClassificationFeedback({
       inboxId: potential.inbox_id,
       userId: userId ?? potential.user_id,
-      originalCategory: "new_business_opportunity",
-      correctedCategory: "new_business_opportunity",
+      originalCategory:
+        potential.item_type === "client_communication"
+          ? "existing_client"
+          : "new_business_opportunity",
+      correctedCategory:
+        potential.item_type === "client_communication"
+          ? "existing_client"
+          : "new_business_opportunity",
       originalConfidence: potential.ai_confidence,
       feedbackAction: "approved",
       companyNameOverride: potential.company_name,
@@ -175,6 +189,7 @@ export async function mergePotentialOpportunityCompanyAction(
       .update({
         detected_company_name: company.company_name,
         detected_website: company.website,
+        company_id: company.id,
       })
       .eq("id", potential.inbox_id);
 

@@ -1,6 +1,8 @@
-import type { Json } from "@/types/database";
+import type { InboxItemType, Json } from "@/types/database";
 
 export type PotentialOpportunityStatus = "pending" | "accepted" | "dismissed";
+
+export type { InboxItemType };
 
 export type PotentialOpportunity = {
   id: string;
@@ -10,6 +12,7 @@ export type PotentialOpportunity = {
   contact_id: string | null;
   opportunity_id: string | null;
   status: PotentialOpportunityStatus;
+  item_type: InboxItemType;
   company_name: string;
   contact_name: string | null;
   contact_email: string | null;
@@ -25,6 +28,9 @@ export type PotentialOpportunity = {
   ai_confidence: number;
   ai_reasoning: string | null;
   extraction_json: Json;
+  linked_opportunity_id: string | null;
+  linked_quote_id: string | null;
+  linked_project_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -49,3 +55,13 @@ export type PotentialOpportunityWithInbox = PotentialOpportunity & {
     logo_url: string | null;
   } | null;
 };
+
+export function isNewOpportunityItem(item: Pick<PotentialOpportunity, "item_type">) {
+  return item.item_type === "new_opportunity";
+}
+
+export function isClientCommunicationItem(
+  item: Pick<PotentialOpportunity, "item_type">,
+) {
+  return item.item_type === "client_communication";
+}

@@ -12,6 +12,8 @@ export async function createOpportunityFromInbox(
   inbox: InboxEmail,
   classification: AiClassificationResult,
   overrides?: {
+    companyId?: string;
+    contactId?: string;
     companyName?: string;
     category?: string;
     estimatedBudget?: number | null;
@@ -33,18 +35,27 @@ export async function createOpportunityFromInbox(
   const website =
     classification.website || inbox.detected_website || null;
 
-  const company = await findOrCreateCompany({
-    companyName,
-    website,
-    emailBody: inbox.body_plain ?? inbox.body_html,
-    senderEmail: inbox.sender_email,
-  });
+  let companyId = overrides?.companyId ?? inbox.company_id ?? null;
+  let contactId = overrides?.contactId ?? null;
 
-  const contact = await findOrCreateContact(
-    company.id,
-    contactName,
-    inbox.sender_email,
-  );
+  if (!companyId) {
+    const company = await findOrCreateCompany({
+      companyName,
+      website,
+      emailBody: inbox.body_plain ?? inbox.body_html,
+      senderEmail: inbox.sender_email,
+    });
+    companyId = company.id;
+  }
+
+  if (!contactId) {
+    const contact = await findOrCreateContact(
+      companyId,
+      contactName,
+      classification.contact_email || inbox.sender_email,
+    );
+    contactId = contact.id;
+  }
 
   const aiCategory =
     overrides?.category || AI_CATEGORY_LABELS[classification.category];
@@ -60,8 +71,8 @@ export async function createOpportunityFromInbox(
   const { data: opportunity, error: opportunityError } = await supabase
     .from("opportunities")
     .insert({
-      company_id: company.id,
-      contact_id: contact.id,
+      company_id: companyId,
+      contact_id: contactId,
       subject: inbox.subject,
       email_body: inbox.body_plain ?? inbox.body_html,
       ai_category: aiCategory,
@@ -88,15 +99,16 @@ export async function createOpportunityFromInbox(
     .from("inbox")
     .update({
       opportunity_id: opportunity.id,
+      company_id: companyId,
       detected_company_name: companyName,
-      detected_website: website ?? company.website,
+      detected_website: website,
     })
     .eq("id", inbox.id);
 
   void enrichCompanyForOpportunity({
-    companyId: company.id,
+    companyId,
     companyName,
-    website: website ?? company.website,
+    website,
     emailBody: inbox.body_plain ?? inbox.body_html,
     senderEmail: inbox.sender_email,
   });
