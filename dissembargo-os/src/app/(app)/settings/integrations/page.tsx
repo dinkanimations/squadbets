@@ -33,11 +33,11 @@ export default async function IntegrationsSettingsPage({
     <>
       <PageHeader
         title="Integrations"
-        description="Manage third-party service connections."
+        description="Connect Gmail and third-party services to power your workflow."
         icon={Settings}
       />
       <IntegrationsPanel
-        gmail={status.gmail}
+        gmailConnections={status.gmail}
         openai={status.openai}
         supabase={status.supabase}
         gmailMessage={gmailMessage}

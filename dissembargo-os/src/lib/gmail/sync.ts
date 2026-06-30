@@ -1,5 +1,5 @@
 import type { GmailConnection } from "@/types/database";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServiceClient } from "@/lib/supabase/service";
 import {
   createGmailClient,
   getGmailProfile,
@@ -13,6 +13,7 @@ export type SyncResult = {
   skipped: number;
   status: "success" | "error";
   error?: string;
+  gmailAddress?: string;
 };
 
 async function getValidAccessToken(connection: GmailConnection) {
@@ -29,9 +30,9 @@ async function getValidAccessToken(connection: GmailConnection) {
   }
 
   const refreshed = await refreshAccessToken(connection.refresh_token);
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
-  await admin
+  await supabase
     .from("gmail_connections")
     .update({
       access_token: refreshed.accessToken,
@@ -51,11 +52,11 @@ async function importMessage(
   connection: GmailConnection,
   messageId: string,
 ) {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
   const { accessToken, refreshToken } = await getValidAccessToken(connection);
   const gmail = createGmailClient(accessToken, refreshToken);
 
-  const { data: existing } = await admin
+  const { data: existing } = await supabase
     .from("inbox")
     .select("id")
     .eq("user_id", userId)
@@ -82,10 +83,11 @@ async function importMessage(
 
   const parsed = parseGmailMessage(message);
 
-  const { data: inserted, error } = await admin
+  const { data: inserted, error } = await supabase
     .from("inbox")
     .insert({
       user_id: userId,
+      gmail_connection_id: connection.id,
       ...parsed,
       attachments: parsed.attachments,
       ai_processing_status: "pending",
@@ -187,11 +189,16 @@ async function syncViaHistory(
 export async function syncGmailConnection(
   connection: GmailConnection,
 ): Promise<SyncResult> {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
   let imported = 0;
   let skipped = 0;
 
   try {
+    await supabase
+      .from("gmail_connections")
+      .update({ last_sync_status: "syncing", last_sync_error: null })
+      .eq("id", connection.id);
+
     const { messageIds, newHistoryId } = await syncViaHistory(connection);
 
     for (const messageId of messageIds) {
@@ -217,7 +224,7 @@ export async function syncGmailConnection(
       }
     }
 
-    await admin
+    await supabase
       .from("gmail_connections")
       .update({
         history_id: newHistoryId,
@@ -227,12 +234,17 @@ export async function syncGmailConnection(
       })
       .eq("id", connection.id);
 
-    return { imported, skipped, status: "success" };
+    return {
+      imported,
+      skipped,
+      status: "success",
+      gmailAddress: connection.gmail_address,
+    };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Gmail sync failed";
 
-    await admin
+    await supabase
       .from("gmail_connections")
       .update({
         last_sync_at: new Date().toISOString(),
@@ -241,14 +253,35 @@ export async function syncGmailConnection(
       })
       .eq("id", connection.id);
 
-    return { imported, skipped, status: "error", error: message };
+    return {
+      imported,
+      skipped,
+      status: "error",
+      error: message,
+      gmailAddress: connection.gmail_address,
+    };
   }
 }
 
-export async function syncAllGmailConnections() {
-  const admin = createAdminClient();
+export async function syncUserGmailConnections(userId: string) {
+  const { getUserGmailConnectionsForSync } = await import(
+    "@/lib/database/gmail-connections"
+  );
 
-  const { data: connections, error } = await admin
+  const connections = await getUserGmailConnectionsForSync(userId);
+  const results = [];
+
+  for (const connection of connections) {
+    results.push(await syncGmailConnection(connection));
+  }
+
+  return results;
+}
+
+export async function syncAllGmailConnections() {
+  const supabase = await createServiceClient();
+
+  const { data: connections, error } = await supabase
     .from("gmail_connections")
     .select("*");
 

@@ -12,3 +12,14 @@ export type GmailConnectionStatus = {
   last_sync_error: string | null;
   is_connected: boolean;
 };
+
+export const GMAIL_SYNC_STATUS_LABELS: Record<string, string> = {
+  success: "Connected",
+  error: "Error",
+  pending: "Pending",
+  syncing: "Syncing",
+};
+
+export function getGmailSyncStatusLabel(status: string): string {
+  return GMAIL_SYNC_STATUS_LABELS[status] ?? status;
+}

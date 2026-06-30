@@ -6,6 +6,8 @@ import { syncGmailConnection } from "@/lib/gmail/sync";
 import { upsertGmailConnection } from "@/lib/database/gmail-connections";
 import { getUser } from "@/lib/auth/session";
 
+const INTEGRATIONS_URL = "/settings/integrations";
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -13,7 +15,9 @@ export async function GET(request: Request) {
   const oauthError = searchParams.get("error");
 
   if (oauthError) {
-    redirect(`/settings?gmail=error&message=${encodeURIComponent(oauthError)}`);
+    redirect(
+      `${INTEGRATIONS_URL}?gmail=error&message=${encodeURIComponent(oauthError)}`,
+    );
   }
 
   const cookieStore = await cookies();
@@ -22,13 +26,13 @@ export async function GET(request: Request) {
   cookieStore.delete(GMAIL_OAUTH_STATE_COOKIE);
 
   if (!code || !state || !storedState || state !== storedState) {
-    redirect("/settings?gmail=error&message=invalid_oauth_state");
+    redirect(`${INTEGRATIONS_URL}?gmail=error&message=invalid_oauth_state`);
   }
 
   const { user, error: authError } = await getUser();
 
   if (authError || !user) {
-    redirect("/login?redirectTo=/settings");
+    redirect("/login?redirectTo=/settings/integrations");
   }
 
   try {
@@ -36,7 +40,7 @@ export async function GET(request: Request) {
     const { tokens } = await oauth2Client.getToken(code);
 
     if (!tokens.access_token || !tokens.refresh_token) {
-      redirect("/settings?gmail=error&message=missing_tokens");
+      redirect(`${INTEGRATIONS_URL}?gmail=error&message=missing_tokens`);
     }
 
     oauth2Client.setCredentials(tokens);
@@ -49,7 +53,7 @@ export async function GET(request: Request) {
     const gmailAddress = profile.data.emailAddress;
 
     if (!gmailAddress) {
-      redirect("/settings?gmail=error&message=missing_email");
+      redirect(`${INTEGRATIONS_URL}?gmail=error&message=missing_email`);
     }
 
     const connection = await upsertGmailConnection({
@@ -67,10 +71,12 @@ export async function GET(request: Request) {
 
     await syncGmailConnection(connection);
 
-    redirect("/settings?gmail=connected");
+    redirect(`${INTEGRATIONS_URL}?gmail=connected`);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "gmail_connection_failed";
-    redirect(`/settings?gmail=error&message=${encodeURIComponent(message)}`);
+    redirect(
+      `${INTEGRATIONS_URL}?gmail=error&message=${encodeURIComponent(message)}`,
+    );
   }
 }

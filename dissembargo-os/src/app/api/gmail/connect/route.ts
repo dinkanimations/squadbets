@@ -9,7 +9,7 @@ export async function GET() {
   const { user, error } = await getUser();
 
   if (error || !user) {
-    redirect("/login?redirectTo=/settings");
+    redirect("/login?redirectTo=/settings/integrations");
   }
 
   const state = randomBytes(32).toString("hex");

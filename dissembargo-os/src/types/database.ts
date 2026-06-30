@@ -1199,6 +1199,7 @@ export interface Database {
           user_id: string;
           gmail_message_id: string;
           thread_id: string | null;
+          gmail_connection_id: string | null;
           subject: string | null;
           sender_name: string | null;
           sender_email: string | null;
@@ -1228,6 +1229,7 @@ export interface Database {
           user_id: string;
           gmail_message_id: string;
           thread_id?: string | null;
+          gmail_connection_id?: string | null;
           subject?: string | null;
           sender_name?: string | null;
           sender_email?: string | null;
@@ -1257,6 +1259,7 @@ export interface Database {
           user_id?: string;
           gmail_message_id?: string;
           thread_id?: string | null;
+          gmail_connection_id?: string | null;
           subject?: string | null;
           sender_name?: string | null;
           sender_email?: string | null;

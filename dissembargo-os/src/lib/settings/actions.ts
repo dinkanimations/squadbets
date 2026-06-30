@@ -312,12 +312,12 @@ export async function deleteTeamMemberAction(
 }
 
 export async function getIntegrationStatusAction() {
-  const { getGmailConnectionStatus } = await import(
+  const { getUserGmailConnections } = await import(
     "@/lib/database/gmail-connections"
   );
   const { hasOpenAIEnv } = await import("@/lib/ai/client");
 
-  const gmail = await getGmailConnectionStatus();
+  const gmail = await getUserGmailConnections();
 
   const supabaseConfigured = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&

@@ -5,7 +5,7 @@ import { InboxFilters } from "@/components/inbox/InboxFilters";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getInboxEmails } from "@/lib/database/inbox";
-import { getGmailConnectionStatus } from "@/lib/database/gmail-connections";
+import { getUserGmailConnections } from "@/lib/database/gmail-connections";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import type { InboxFilterCategory } from "@/lib/ai/constants";
@@ -36,13 +36,13 @@ async function InboxContent({
   let connection = null;
 
   try {
-    const [inboxResult, connectionResult] = await Promise.all([
+    const [inboxResult, connections] = await Promise.all([
       getInboxEmails({ filter }),
-      getGmailConnectionStatus(),
+      getUserGmailConnections(),
     ]);
 
     emails = inboxResult.data;
-    connection = connectionResult;
+    connection = connections.length > 0 ? connections[0] : null;
   } catch (err) {
     error =
       err instanceof Error
@@ -54,7 +54,7 @@ async function InboxContent({
     <>
       <PageHeader
         title="Inbox"
-        description="Gmail emails classified by AI — job enquiries become opportunities, everything else stays organised here."
+        description="Gmail emails classified by AI — new business enquiries become opportunities, everything else stays organised here."
         icon={Mail}
       />
 
@@ -65,10 +65,10 @@ async function InboxContent({
       ) : !connection ? (
         <EmptyState
           title="Gmail not connected"
-          description="Connect your Gmail account in Settings to start importing inbox emails."
+          description="Connect a Gmail account in Integrations to start importing emails automatically."
           action={
-            <Link href="/settings">
-              <Button>Go to Settings</Button>
+            <Link href="/settings/integrations">
+              <Button>Connect Gmail</Button>
             </Link>
           }
         />
@@ -81,10 +81,10 @@ async function InboxContent({
           {emails.length === 0 ? (
             <EmptyState
               title="No emails in this view"
-              description="Try a different filter, or sync Gmail from Settings to import new emails."
+              description="Try a different filter, or sync Gmail from Integrations to import new emails."
               action={
-                <Link href="/settings">
-                  <Button>Open Settings</Button>
+                <Link href="/settings/integrations">
+                  <Button>Open Integrations</Button>
                 </Link>
               }
             />

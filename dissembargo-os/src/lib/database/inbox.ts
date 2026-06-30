@@ -19,14 +19,16 @@ function applyInboxFilter(query: any, filter?: InboxFilterCategory) {
   if (!filter || filter === "all") return query;
 
   switch (filter) {
-    case "job_enquiries":
+    case "new_business":
       return query.eq("ai_category", JOB_ENQUIRY_CATEGORY);
     case "existing_clients":
       return query.eq("ai_category", "existing_client");
+    case "suppliers":
+      return query.eq("ai_category", "supplier");
     case "invoices":
       return query.eq("ai_category", "invoice");
     case "marketing":
-      return query.in("ai_category", ["marketing", "newsletter"]);
+      return query.in("ai_category", ["marketing", "newsletter", "recruitment"]);
     case "spam":
       return query.eq("ai_category", "spam");
     case "unread":

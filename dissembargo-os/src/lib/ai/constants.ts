@@ -14,7 +14,7 @@ export const AI_EMAIL_CATEGORIES = [
 export type AiEmailCategory = (typeof AI_EMAIL_CATEGORIES)[number];
 
 export const AI_CATEGORY_LABELS: Record<AiEmailCategory, string> = {
-  new_business_opportunity: "New Job Enquiry",
+  new_business_opportunity: "New Business",
   existing_client: "Existing Client",
   supplier: "Supplier",
   invoice: "Invoice",
@@ -61,8 +61,9 @@ export type AiFeedbackAction =
 
 export type InboxFilterCategory =
   | "all"
-  | "job_enquiries"
+  | "new_business"
   | "existing_clients"
+  | "suppliers"
   | "invoices"
   | "marketing"
   | "spam"
@@ -73,8 +74,9 @@ export const INBOX_FILTER_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "all", label: "All" },
-  { value: "job_enquiries", label: "Job Enquiries" },
+  { value: "new_business", label: "New Business" },
   { value: "existing_clients", label: "Existing Clients" },
+  { value: "suppliers", label: "Suppliers" },
   { value: "invoices", label: "Invoices" },
   { value: "marketing", label: "Marketing" },
   { value: "spam", label: "Spam" },

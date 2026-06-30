@@ -37,7 +37,7 @@ Return a JSON object with these exact keys:
 - contact_name: detected contact full name, or null
 - website: detected company website URL, or null
 - estimated_budget: numeric budget amount mentioned in the email (GBP/USD/EUR), or null
-- requested_deliverables: comma-separated list of creative deliverables requested, or null
+- requested_deliverables: comma-separated list of requested services or creative deliverables, or null
 
 Classification guide (understand meaning, not keywords):
 - new_business_opportunity: A genuine NEW business enquiry where someone is asking about a quote, pricing, proposal, project, creative work, animation, CGI, rendering, medical visualisation, product launch visuals, or production support. This is from a potential new client, not an existing relationship.

@@ -148,7 +148,7 @@ export function OpportunityDetailClient({
 
           {opportunity.requested_deliverables && (
             <Card>
-              <CardHeader title="Requested Deliverables" />
+              <CardHeader title="Requested Services" />
               <p className="whitespace-pre-wrap text-sm text-foreground">
                 {opportunity.requested_deliverables}
               </p>
