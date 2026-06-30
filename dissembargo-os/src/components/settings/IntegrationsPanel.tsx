@@ -1,6 +1,7 @@
 "use client";
 
 import { GmailConnectionCard } from "@/components/settings/GmailConnectionCard";
+import { OpenAIConnectionCard } from "@/components/settings/OpenAIConnectionCard";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { GmailConnectionStatus } from "@/lib/gmail/constants";
@@ -35,29 +36,10 @@ export function IntegrationsPanel({
         error={gmailError}
       />
 
-      <Card>
-        <CardHeader
-          title="OpenAI"
-          description="Powers email classification and company intelligence"
-        />
-        <div className="flex items-center justify-between rounded-lg bg-surface-elevated p-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              API Connection
-            </p>
-            <p className="text-xs text-muted">
-              Model: {openai.model} · Key configured via environment
-            </p>
-          </div>
-          <Badge variant={openai.configured ? "success" : "danger"}>
-            {openai.configured ? "Connected" : "Not configured"}
-          </Badge>
-        </div>
-        <p className="mt-3 text-xs text-muted">
-          API keys are managed securely via server environment variables and are
-          never exposed in the application.
-        </p>
-      </Card>
+      <OpenAIConnectionCard
+        configured={openai.configured}
+        model={openai.model}
+      />
 
       <Card>
         <CardHeader

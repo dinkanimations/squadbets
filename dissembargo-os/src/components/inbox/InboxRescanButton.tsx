@@ -45,15 +45,16 @@ export function InboxRescanButton({
           );
         }
 
-        if (parts.length === 0) {
+        if (parts.length === 0 && !data.failed) {
           setMessage("Scan complete — no new leads in this batch.");
-        } else {
+        } else if (parts.length > 0) {
           setMessage(`Scan complete — ${parts.join(", ")}.`);
         }
 
         if (data.failed > 0) {
           setError(
-            `${data.failed} email${data.failed === 1 ? "" : "s"} failed AI processing. Check your OpenAI API key and quota, then scan again.`,
+            data.error ??
+              `${data.failed} email${data.failed === 1 ? "" : "s"} failed AI processing.`,
           );
         }
 

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { formatAiProcessingError } from "@/lib/ai/health";
 import { withDevDbFallback } from "./utils";
 
 export type InboxProcessingStats = {
@@ -9,6 +10,14 @@ export type InboxProcessingStats = {
   completed: number;
   ignored: number;
   stagedLeads: number;
+  topFailureReason: string | null;
+  failureCode:
+    | "quota_exceeded"
+    | "missing_key"
+    | "invalid_key"
+    | "rate_limit"
+    | "other"
+    | null;
 };
 
 export async function getFailedInboxCountForUser(userId: string): Promise<number> {
@@ -35,6 +44,7 @@ export async function getInboxProcessingStats(): Promise<InboxProcessingStats> {
       { count: completed },
       { count: ignored },
       { count: stagedLeads },
+      { data: failedSamples },
     ] = await Promise.all([
       supabase.from("inbox").select("id", { count: "exact", head: true }),
       supabase
@@ -57,7 +67,19 @@ export async function getInboxProcessingStats(): Promise<InboxProcessingStats> {
         .from("potential_opportunities")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending"),
+      supabase
+        .from("inbox")
+        .select("ai_processing_error")
+        .eq("ai_processing_status", "failed")
+        .not("ai_processing_error", "is", null)
+        .limit(1),
     ]);
+
+    const topFailureReason =
+      failedSamples?.[0]?.ai_processing_error?.trim() ?? null;
+    const failureCode = topFailureReason
+      ? formatAiProcessingError(topFailureReason).code
+      : null;
 
     return {
       totalImported: totalImported ?? 0,
@@ -66,6 +88,8 @@ export async function getInboxProcessingStats(): Promise<InboxProcessingStats> {
       completed: completed ?? 0,
       ignored: ignored ?? 0,
       stagedLeads: stagedLeads ?? 0,
+      topFailureReason,
+      failureCode,
     };
   }, {
     totalImported: 0,
@@ -74,5 +98,7 @@ export async function getInboxProcessingStats(): Promise<InboxProcessingStats> {
     completed: 0,
     ignored: 0,
     stagedLeads: 0,
+    topFailureReason: null,
+    failureCode: null,
   });
 }

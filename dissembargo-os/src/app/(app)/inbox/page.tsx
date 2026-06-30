@@ -8,6 +8,7 @@ import { getPendingPotentialOpportunities } from "@/lib/database/potential-oppor
 import { getInboxSchemaHealth } from "@/lib/database/inbox-schema-health";
 import { getInboxProcessingStats } from "@/lib/database/inbox-stats";
 import { getUserGmailConnections } from "@/lib/database/gmail-connections";
+import { checkOpenAIHealth } from "@/lib/ai/health";
 import { Button } from "@/components/ui/Button";
 import { InboxRescanButton } from "@/components/inbox/InboxRescanButton";
 import Link from "next/link";
@@ -31,13 +32,16 @@ async function InboxContent() {
   let inboxProjectRef: string | null = null;
   let processingStats: Awaited<ReturnType<typeof getInboxProcessingStats>> | null =
     null;
+  let openaiHealth: Awaited<ReturnType<typeof checkOpenAIHealth>> | null = null;
 
   try {
-    const [potentialResult, connections, inboxSchema, stats] = await Promise.all([
+    const [potentialResult, connections, inboxSchema, stats, health] =
+      await Promise.all([
       getPendingPotentialOpportunities(),
       getUserGmailConnections(),
       getInboxSchemaHealth(),
       getInboxProcessingStats(),
+      checkOpenAIHealth(),
     ]);
 
     opportunities = potentialResult.data;
@@ -45,6 +49,7 @@ async function InboxContent() {
     inboxSchemaReady = inboxSchema.ready;
     inboxProjectRef = inboxSchema.projectRef;
     processingStats = stats;
+    openaiHealth = health;
   } catch (err) {
     error =
       err instanceof Error
@@ -79,7 +84,7 @@ async function InboxContent() {
           }
         />
       ) : opportunities.length === 0 ? (
-        <InboxEmptyState stats={processingStats} />
+        <InboxEmptyState stats={processingStats} openaiHealth={openaiHealth} />
       ) : (
         <PotentialOpportunityList opportunities={opportunities} />
       )}
@@ -89,19 +94,46 @@ async function InboxContent() {
 
 function InboxEmptyState({
   stats,
+  openaiHealth,
 }: {
   stats: Awaited<ReturnType<typeof getInboxProcessingStats>> | null;
+  openaiHealth: Awaited<ReturnType<typeof checkOpenAIHealth>> | null;
 }) {
   const needsScan = (stats?.failed ?? 0) + (stats?.pending ?? 0);
   const scannedCount = stats?.completed ?? 0;
+  const quotaBlocked =
+    openaiHealth?.status === "quota_exceeded" ||
+    stats?.failureCode === "quota_exceeded";
+
+  const quotaBanner = quotaBlocked ? (
+    <div className="mb-4 max-w-lg rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-left text-sm">
+      <p className="font-medium text-foreground">OpenAI quota exceeded</p>
+      <p className="mt-1 text-muted">
+        Your API key is configured, but the OpenAI account has no remaining
+        credits. Add billing at{" "}
+        <a
+          href="https://platform.openai.com/settings/organization/billing"
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent underline"
+        >
+          platform.openai.com
+        </a>
+        , then return here and click Scan mailbox again.
+      </p>
+    </div>
+  ) : null;
 
   if (stats && stats.totalImported > 0 && needsScan > 0) {
     return (
       <EmptyState
         title="Emails imported — scan needed"
-        description={`${stats.totalImported} email${stats.totalImported === 1 ? "" : "s"} imported from Gmail, but ${needsScan} still need AI scanning before leads can appear. This usually happens when OpenAI wasn't configured during the first sync.`}
+        description={`${stats.totalImported} email${stats.totalImported === 1 ? "" : "s"} imported from Gmail, but ${needsScan} still need AI scanning before leads can appear.`}
         action={
-          <InboxRescanButton pendingCount={needsScan} />
+          <div className="flex flex-col items-center">
+            {quotaBanner}
+            <InboxRescanButton pendingCount={needsScan} />
+          </div>
         }
       />
     );
