@@ -72,7 +72,8 @@ export type InboxReviewStatus =
   | "pending_review"
   | "approved"
   | "rejected"
-  | "auto_created";
+  | "auto_created"
+  | "ignored";
 
 export type AiProcessingStatus =
   | "pending"
@@ -1285,6 +1286,116 @@ export interface Database {
           detected_website?: string | null;
         };
         Relationships: [];
+      };
+      potential_opportunities: {
+        Row: {
+          id: string;
+          user_id: string;
+          inbox_id: string;
+          company_id: string | null;
+          contact_id: string | null;
+          opportunity_id: string | null;
+          status: "pending" | "accepted" | "dismissed";
+          company_name: string;
+          contact_name: string | null;
+          contact_email: string | null;
+          contact_phone: string | null;
+          company_website: string | null;
+          project_name: string | null;
+          project_description: string | null;
+          deliverables: string | null;
+          estimated_budget: number | null;
+          deadline: string | null;
+          location: string | null;
+          ai_summary: string;
+          ai_confidence: number;
+          ai_reasoning: string | null;
+          extraction_json: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          inbox_id: string;
+          company_id?: string | null;
+          contact_id?: string | null;
+          opportunity_id?: string | null;
+          status?: "pending" | "accepted" | "dismissed";
+          company_name: string;
+          contact_name?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          company_website?: string | null;
+          project_name?: string | null;
+          project_description?: string | null;
+          deliverables?: string | null;
+          estimated_budget?: number | null;
+          deadline?: string | null;
+          location?: string | null;
+          ai_summary: string;
+          ai_confidence: number;
+          ai_reasoning?: string | null;
+          extraction_json?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          inbox_id?: string;
+          company_id?: string | null;
+          contact_id?: string | null;
+          opportunity_id?: string | null;
+          status?: "pending" | "accepted" | "dismissed";
+          company_name?: string;
+          contact_name?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          company_website?: string | null;
+          project_name?: string | null;
+          project_description?: string | null;
+          deliverables?: string | null;
+          estimated_budget?: number | null;
+          deadline?: string | null;
+          location?: string | null;
+          ai_summary?: string;
+          ai_confidence?: number;
+          ai_reasoning?: string | null;
+          extraction_json?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "potential_opportunities_inbox_id_fkey";
+            columns: ["inbox_id"];
+            isOneToOne: true;
+            referencedRelation: "inbox";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "potential_opportunities_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "potential_opportunities_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "potential_opportunities_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       ai_classification_logs: {
         Row: {

@@ -62,7 +62,8 @@ function TagList({ items, emptyLabel }: { items: string[]; emptyLabel: string })
 
 export function CompanyDetailClient({ profile }: CompanyDetailClientProps) {
   const router = useRouter();
-  const { company, contacts, opportunities, projects, quotes } = profile;
+  const { company, contacts, opportunities, projects, quotes, schedules, emailHistory } =
+    profile;
   const [editOpen, setEditOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -413,6 +414,79 @@ export function CompanyDetailClient({ profile }: CompanyDetailClientProps) {
               </Table>
             ) : (
               <p className="text-sm text-muted">No quotes yet.</p>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader title="Production Schedules" />
+            {schedules.length > 0 ? (
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Schedule</TableHeaderCell>
+                    <TableHeaderCell>Status</TableHeaderCell>
+                    <TableHeaderCell>Delivery</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {schedules.map((schedule) => (
+                    <TableRow key={schedule.id}>
+                      <TableCell>
+                        <Link
+                          href={`/production-schedules/${schedule.id}`}
+                          className="font-medium hover:text-accent"
+                        >
+                          {schedule.project_title}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge>{schedule.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted">
+                        {schedule.delivery_date
+                          ? formatCompanyDate(schedule.delivery_date)
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted">No production schedules yet.</p>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader title="Email History" />
+            {emailHistory.length > 0 ? (
+              <ul className="space-y-4">
+                {emailHistory.map((item) => (
+                  <li key={item.id} className="rounded-lg border border-border p-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge>{item.status}</Badge>
+                      <span className="text-xs text-muted">
+                        {item.inbox?.date_received
+                          ? formatCompanyDate(item.inbox.date_received)
+                          : formatCompanyDate(item.created_at)}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-medium text-foreground">
+                      {item.inbox?.subject ?? "Email enquiry"}
+                    </p>
+                    <p className="mt-1 text-muted">{item.ai_summary}</p>
+                    {item.status === "pending" && (
+                      <Link
+                        href={`/inbox/${item.id}`}
+                        className="mt-2 inline-block text-xs text-accent hover:underline"
+                      >
+                        Review in Inbox
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">No email history linked yet.</p>
             )}
           </Card>
         </div>

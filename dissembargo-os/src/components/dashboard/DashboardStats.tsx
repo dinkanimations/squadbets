@@ -1,10 +1,11 @@
-import { Building2, ClipboardCheck, Mail, Sparkles, Target } from "lucide-react";
+import { Building2, Mail, Sparkles, Target } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { countOpportunities } from "@/lib/database/opportunities";
 import {
   countInboxEmails,
   countOpportunitiesCreatedToday,
 } from "@/lib/database/inbox";
+import { countPendingPotentialOpportunities } from "@/lib/database/potential-opportunities";
 import { countCompaniesThisMonth } from "@/lib/database/companies";
 import { QuoteStats } from "@/components/dashboard/QuoteStats";
 import { ProductionScheduleStats } from "@/components/dashboard/ProductionScheduleStats";
@@ -40,7 +41,7 @@ export async function DashboardStats() {
   }
 
   try {
-    reviewQueueCount = await countInboxEmails({ reviewPending: true });
+    reviewQueueCount = await countPendingPotentialOpportunities();
   } catch {
     reviewError = true;
   }
@@ -82,26 +83,26 @@ export async function DashboardStats() {
         icon={Mail}
       />
       <StatCard
-        title="Emails Awaiting Review"
+        title="Potential Opportunities"
         value={reviewError ? "—" : String(reviewQueueCount)}
         change={
           reviewError
             ? "Unable to load from database"
-            : "Low-confidence opportunities"
+            : "Awaiting your review in Inbox"
         }
         changeType={reviewError ? "negative" : "neutral"}
-        icon={ClipboardCheck}
+        icon={Target}
       />
       <StatCard
-        title="Opportunities Created Today"
+        title="Opportunities Accepted Today"
         value={opportunitiesTodayError ? "—" : String(opportunitiesTodayCount)}
         change={
           opportunitiesTodayError
             ? "Unable to load from database"
-            : "Auto-created from AI qualification"
+            : "Accepted from Inbox today"
         }
         changeType={opportunitiesTodayError ? "negative" : "positive"}
-        icon={Target}
+        icon={Sparkles}
       />
       <StatCard
         title="New Companies This Month"

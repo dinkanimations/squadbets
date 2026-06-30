@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { InboxEmailDetail } from "@/components/inbox/InboxEmailDetail";
-import { getInboxEmailById } from "@/lib/database/inbox";
-import type { InboxEmail } from "@/types/database";
+import { PotentialOpportunityDetail } from "@/components/inbox/PotentialOpportunityDetail";
+import { getPotentialOpportunityById } from "@/lib/database/potential-opportunities";
+import { getAllCompanies } from "@/lib/database/companies";
 
 interface InboxDetailPageProps {
   params: Promise<{ id: string }>;
@@ -9,17 +9,24 @@ interface InboxDetailPageProps {
 
 export default async function InboxDetailPage({ params }: InboxDetailPageProps) {
   const { id } = await params;
-  let email: InboxEmail | null = null;
 
   try {
-    email = await getInboxEmailById(id);
+    const [potential, companies] = await Promise.all([
+      getPotentialOpportunityById(id),
+      getAllCompanies(),
+    ]);
+
+    if (!potential) {
+      notFound();
+    }
+
+    return (
+      <PotentialOpportunityDetail
+        potential={potential}
+        companies={companies ?? []}
+      />
+    );
   } catch {
     notFound();
   }
-
-  if (!email) {
-    notFound();
-  }
-
-  return <InboxEmailDetail email={email} />;
 }

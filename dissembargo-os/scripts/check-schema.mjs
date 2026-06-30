@@ -38,6 +38,7 @@ const REQUIRED_TABLES = [
   "gmail_connections",
   "quotes",
   "production_schedules",
+  "potential_opportunities",
 ];
 
 if (!url || !key) {

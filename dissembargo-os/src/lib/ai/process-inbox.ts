@@ -1,10 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type { InboxEmail } from "@/types/database";
 import { classifyEmail } from "./classify-email";
-import { createOpportunityFromInbox } from "./create-opportunity-from-inbox";
+import { createPotentialOpportunityFromInbox } from "./create-potential-opportunity";
 import {
-  AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD,
   isJobEnquiryCategory,
+  POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE,
   type AiActionTaken,
   type AiEmailCategory,
 } from "./constants";
@@ -55,19 +55,6 @@ async function getThreadContextForInbox(
   return formatThreadContext(data.map(inboxEmailToThreadContext));
 }
 
-function resolveReviewStatus(
-  category: AiEmailCategory,
-  confidence: number,
-): "pending_review" | "auto_created" | null {
-  if (!isJobEnquiryCategory(category)) return null;
-
-  if (confidence >= AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD) {
-    return "auto_created";
-  }
-
-  return "pending_review";
-}
-
 export async function processInboxEmail(
   inboxId: string,
 ): Promise<ProcessInboxResult> {
@@ -106,21 +93,29 @@ export async function processInboxEmail(
       threadContext,
     });
 
-    let actionTaken: AiActionTaken = "classified_only";
-    let reviewStatus = resolveReviewStatus(result.category, result.confidence);
-    let opportunityId: string | null = inbox.opportunity_id;
+    let actionTaken: AiActionTaken = "ignored";
+    let reviewStatus:
+      | "pending_review"
+      | "approved"
+      | "rejected"
+      | "auto_created"
+      | "ignored"
+      | null = "ignored";
 
-    if (
+    const isPotentialJob =
       isJobEnquiryCategory(result.category) &&
-      result.confidence >= AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD
-    ) {
-      const opportunity = await createOpportunityFromInbox(inbox, result);
-      opportunityId = opportunity.id;
-      actionTaken = "auto_opportunity";
+      result.confidence >= POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE;
+
+    if (isPotentialJob) {
+      await createPotentialOpportunityFromInbox(inbox, result);
+      actionTaken = "potential_opportunity";
+      reviewStatus = "pending_review";
     } else if (isJobEnquiryCategory(result.category)) {
-      actionTaken = "review_queue";
+      reviewStatus = "ignored";
+      actionTaken = "classified_only";
     } else {
-      reviewStatus = null;
+      reviewStatus = "ignored";
+      actionTaken = "ignored";
     }
 
     await supabase
@@ -137,7 +132,6 @@ export async function processInboxEmail(
         ai_processing_status: "completed",
         ai_processing_error: null,
         review_status: reviewStatus,
-        opportunity_id: opportunityId,
       })
       .eq("id", inboxId);
 
@@ -205,12 +199,15 @@ export async function processPendingInboxEmails(limit = 20) {
 export async function reprocessInboxEmail(inboxId: string) {
   const supabase = await createServiceClient();
 
+  await supabase.from("potential_opportunities").delete().eq("inbox_id", inboxId);
+
   await supabase
     .from("inbox")
     .update({
       ai_processing_status: "pending",
       ai_processing_error: null,
       review_status: null,
+      opportunity_id: null,
     })
     .eq("id", inboxId);
 
@@ -229,16 +226,16 @@ export async function updateInboxAiCategory(
 
   const originalCategory = inbox.ai_category;
 
-  let reviewStatus: "pending_review" | "approved" | "rejected" | "auto_created" | null =
-    null;
+  let reviewStatus:
+    | "pending_review"
+    | "approved"
+    | "rejected"
+    | "auto_created"
+    | "ignored"
+    | null = "ignored";
 
   if (isJobEnquiryCategory(category)) {
-    reviewStatus =
-      (inbox.ai_confidence ?? 0) < AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD
-        ? "pending_review"
-        : inbox.review_status === "auto_created"
-          ? "auto_created"
-          : inbox.review_status;
+    reviewStatus = "pending_review";
   }
 
   const { data, error } = await supabase

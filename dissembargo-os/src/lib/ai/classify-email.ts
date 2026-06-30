@@ -35,9 +35,15 @@ Return a JSON object with these exact keys:
 - signature: extracted email signature text, or null
 - company_name: detected company name, or null
 - contact_name: detected contact full name, or null
+- contact_email: detected contact email if different from sender, or null
+- contact_phone: phone number from signature or body, or null
 - website: detected company website URL, or null
-- estimated_budget: numeric budget amount mentioned in the email (GBP/USD/EUR), or null
+- project_name: short name for the requested project or campaign, or null
+- project_description: 2-4 sentence description of what the client wants, or null
+- estimated_budget: numeric budget amount mentioned (GBP/USD/EUR), or null
 - requested_deliverables: comma-separated list of requested services or creative deliverables, or null
+- deadline: any mentioned deadline or delivery date as text, or null
+- location: mentioned location, city, country, or shoot venue, or null
 
 Classification guide (understand meaning, not keywords):
 - new_business_opportunity: A genuine NEW business enquiry where someone is asking about a quote, pricing, proposal, project, creative work, animation, CGI, rendering, medical visualisation, product launch visuals, or production support. This is from a potential new client, not an existing relationship.
@@ -134,10 +140,16 @@ export async function classifyEmail(
       null,
     company_name: String(parsed.company_name ?? "").trim() || null,
     contact_name: String(parsed.contact_name ?? "").trim() || null,
+    contact_email: String(parsed.contact_email ?? "").trim() || null,
+    contact_phone: String(parsed.contact_phone ?? "").trim() || null,
     website: String(parsed.website ?? "").trim() || null,
+    project_name: String(parsed.project_name ?? "").trim() || null,
+    project_description: String(parsed.project_description ?? "").trim() || null,
     estimated_budget: parseOptionalBudget(parsed.estimated_budget),
     requested_deliverables:
       String(parsed.requested_deliverables ?? "").trim() || null,
+    deadline: String(parsed.deadline ?? "").trim() || null,
+    location: String(parsed.location ?? "").trim() || null,
   };
 
   return { result, rawResponse: parsed };

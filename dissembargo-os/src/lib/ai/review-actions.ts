@@ -12,9 +12,10 @@ import {
   logAiClassification,
   logAiClassificationFeedback,
 } from "@/lib/database/ai-logs";
-import type { AiClassificationResult, AiEmailCategory } from "@/lib/ai/constants";
+import type { AiEmailCategory } from "@/lib/ai/constants";
 import {
   AI_CATEGORY_LABELS,
+  classificationFromInboxFields,
   isJobEnquiryCategory,
 } from "@/lib/ai/constants";
 import { getUser } from "@/lib/auth/session";
@@ -51,18 +52,10 @@ export async function approveReviewAction(
       inbox.ai_category ||
       "new_business_opportunity") as AiEmailCategory;
 
-    const classification: AiClassificationResult = {
-      category: categoryValue,
-      confidence: inbox.ai_confidence ?? 0,
-      summary: inbox.ai_summary ?? "",
-      reasoning: inbox.ai_reasoning ?? "",
-      signature: inbox.ai_signature,
+    const classification = classificationFromInboxFields(inbox, {
       company_name: companyName,
-      contact_name: inbox.sender_name,
-      website: inbox.detected_website,
-      estimated_budget: null,
-      requested_deliverables: null,
-    };
+      category: categoryValue,
+    });
 
     const opportunity = await createOpportunityFromInbox(inbox, classification, {
       companyName,
@@ -199,18 +192,9 @@ export async function createOpportunityFromInboxAction(
       return { error: "Company name is required." };
     }
 
-    const classification: AiClassificationResult = {
-      category: inbox.ai_category ?? "new_business_opportunity",
-      confidence: inbox.ai_confidence ?? 0,
-      summary: inbox.ai_summary ?? "",
-      reasoning: inbox.ai_reasoning ?? "",
-      signature: inbox.ai_signature,
+    const classification = classificationFromInboxFields(inbox, {
       company_name: companyName.trim(),
-      contact_name: inbox.sender_name,
-      website: inbox.detected_website,
-      estimated_budget: null,
-      requested_deliverables: null,
-    };
+    });
 
     const opportunity = await createOpportunityFromInbox(inbox, classification, {
       companyName: companyName.trim(),

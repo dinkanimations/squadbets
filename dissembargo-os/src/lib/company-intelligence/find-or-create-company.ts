@@ -116,13 +116,13 @@ export async function findOrCreateContact(
   companyId: string,
   fullName: string,
   email: string | null,
-): Promise<{ id: string }> {
+): Promise<{ id: string; full_name: string; email: string | null }> {
   const admin = createAdminClient();
 
   if (email) {
     const { data: existing } = await admin
       .from("contacts")
-      .select("id")
+      .select("id, full_name, email")
       .eq("company_id", companyId)
       .ilike("email", email)
       .maybeSingle();
@@ -137,7 +137,7 @@ export async function findOrCreateContact(
       full_name: fullName.trim() || "Unknown Contact",
       email,
     })
-    .select("id")
+    .select("id, full_name, email")
     .single();
 
   if (error) {

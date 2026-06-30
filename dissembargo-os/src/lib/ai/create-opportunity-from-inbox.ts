@@ -67,7 +67,12 @@ export async function createOpportunityFromInbox(
       ai_category: aiCategory,
       ai_confidence: classification.confidence,
       opportunity_status: "new",
-      notes: classification.summary,
+      notes: [
+        classification.summary,
+        classification.project_description,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       estimated_budget: estimatedBudget,
       requested_deliverables: requestedDeliverables,
       inbox_id: inbox.id,

@@ -152,14 +152,52 @@ export async function getCompanyProfile(id: string) {
     project_title: string | null;
   }> = [];
 
-  const { data: companyQuotes } = await supabase
-    .from("quotes")
-    .select("id, quote_number, quote_status, total, project_title")
-    .eq("company_id", id)
-    .eq("is_archived", false)
-    .order("created_at", { ascending: false });
+  let schedules: Array<{
+    id: string;
+    project_title: string;
+    status: string;
+    delivery_date: string | null;
+  }> = [];
+
+  const [{ data: companyQuotes }, { data: companySchedules }, { data: emailHistory }] =
+    await Promise.all([
+    supabase
+      .from("quotes")
+      .select("id, quote_number, quote_status, total, project_title")
+      .eq("company_id", id)
+      .eq("is_archived", false)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("production_schedules")
+      .select("id, project_title, status, delivery_date")
+      .eq("company_id", id)
+      .neq("status", "archived")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("potential_opportunities")
+      .select(
+        `
+        id,
+        status,
+        ai_summary,
+        ai_confidence,
+        created_at,
+        inbox:inbox!potential_opportunities_inbox_id_fkey (
+          id,
+          subject,
+          sender_name,
+          sender_email,
+          date_received,
+          opportunity_id
+        )
+      `,
+      )
+      .eq("company_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   quotes = companyQuotes ?? [];
+  schedules = companySchedules ?? [];
 
   if (client) {
     const { data: projectData } = await supabase
@@ -177,6 +215,8 @@ export async function getCompanyProfile(id: string) {
     opportunities: opportunities ?? [],
     projects,
     quotes,
+    schedules,
+    emailHistory: emailHistory ?? [],
     client,
   };
 }

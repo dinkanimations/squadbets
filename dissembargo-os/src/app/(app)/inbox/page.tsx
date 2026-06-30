@@ -1,47 +1,36 @@
 import { Suspense } from "react";
-import { Mail } from "lucide-react";
-import { InboxEmailList } from "@/components/inbox/InboxEmailList";
-import { InboxFilters } from "@/components/inbox/InboxFilters";
+import { Sparkles } from "lucide-react";
+import { PotentialOpportunityList } from "@/components/inbox/PotentialOpportunityList";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { getInboxEmails } from "@/lib/database/inbox";
+import { getPendingPotentialOpportunities } from "@/lib/database/potential-opportunities";
 import { getUserGmailConnections } from "@/lib/database/gmail-connections";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
-import type { InboxFilterCategory } from "@/lib/ai/constants";
 import InboxLoading from "./loading";
 
-interface InboxPageProps {
-  searchParams: Promise<{ filter?: string }>;
-}
-
-export default async function InboxPage({ searchParams }: InboxPageProps) {
+export default async function InboxPage() {
   return (
     <Suspense fallback={<InboxLoading />}>
-      <InboxContent searchParams={searchParams} />
+      <InboxContent />
     </Suspense>
   );
 }
 
-async function InboxContent({
-  searchParams,
-}: {
-  searchParams: Promise<{ filter?: string }>;
-}) {
-  const params = await searchParams;
-  const filter = (params.filter as InboxFilterCategory | undefined) ?? "all";
-
-  let emails: Awaited<ReturnType<typeof getInboxEmails>>["data"] = [];
+async function InboxContent() {
+  let opportunities: Awaited<
+    ReturnType<typeof getPendingPotentialOpportunities>
+  >["data"] = [];
   let error: string | null = null;
   let connection = null;
 
   try {
-    const [inboxResult, connections] = await Promise.all([
-      getInboxEmails({ filter }),
+    const [potentialResult, connections] = await Promise.all([
+      getPendingPotentialOpportunities(),
       getUserGmailConnections(),
     ]);
 
-    emails = inboxResult.data;
+    opportunities = potentialResult.data;
     connection = connections.length > 0 ? connections[0] : null;
   } catch (err) {
     error =
@@ -54,8 +43,8 @@ async function InboxContent({
     <>
       <PageHeader
         title="Inbox"
-        description="Gmail emails classified by AI — new business enquiries become opportunities, everything else stays organised here."
-        icon={Mail}
+        description="Your business development assistant — only genuine potential job enquiries appear here. Everything else stays in Gmail."
+        icon={Sparkles}
       />
 
       {error ? (
@@ -65,33 +54,25 @@ async function InboxContent({
       ) : !connection ? (
         <EmptyState
           title="Gmail not connected"
-          description="Connect a Gmail account in Integrations to start importing emails automatically."
+          description="Connect Gmail to automatically scan new emails for potential business opportunities."
           action={
             <Link href="/settings/integrations">
               <Button>Connect Gmail</Button>
             </Link>
           }
         />
+      ) : opportunities.length === 0 ? (
+        <EmptyState
+          title="No potential opportunities"
+          description="Sync Gmail from Integrations. The AI will scan new emails and surface genuine job enquiries here — newsletters, invoices, and spam are ignored."
+          action={
+            <Link href="/settings/integrations">
+              <Button>Sync Gmail</Button>
+            </Link>
+          }
+        />
       ) : (
-        <>
-          <Suspense fallback={null}>
-            <InboxFilters />
-          </Suspense>
-
-          {emails.length === 0 ? (
-            <EmptyState
-              title="No emails in this view"
-              description="Try a different filter, or sync Gmail from Integrations to import new emails."
-              action={
-                <Link href="/settings/integrations">
-                  <Button>Open Integrations</Button>
-                </Link>
-              }
-            />
-          ) : (
-            <InboxEmailList emails={emails} />
-          )}
-        </>
+        <PotentialOpportunityList opportunities={opportunities} />
       )}
     </>
   );

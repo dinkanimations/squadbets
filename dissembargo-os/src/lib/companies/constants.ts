@@ -2,6 +2,22 @@ import type { Company, Contact, Opportunity } from "@/types/database";
 
 export type CompanyWithRelations = Company;
 
+export type CompanyEmailHistoryItem = {
+  id: string;
+  status: string;
+  ai_summary: string;
+  ai_confidence: number;
+  created_at: string;
+  inbox: {
+    id: string;
+    subject: string | null;
+    sender_name: string | null;
+    sender_email: string | null;
+    date_received: string;
+    opportunity_id: string | null;
+  } | null;
+};
+
 export type CompanyProfileData = {
   company: Company;
   contacts: Contact[];
@@ -20,6 +36,13 @@ export type CompanyProfileData = {
     total: number;
     project_title: string | null;
   }>;
+  schedules: Array<{
+    id: string;
+    project_title: string;
+    status: string;
+    delivery_date: string | null;
+  }>;
+  emailHistory: CompanyEmailHistoryItem[];
   client: { id: string; client_status: string } | null;
 };
 
