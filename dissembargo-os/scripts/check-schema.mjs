@@ -72,7 +72,7 @@ for (const table of REQUIRED_TABLES) {
 console.log(
   missing === 0
     ? "\nAll core tables exist.\n"
-    : `\n${missing} table(s) missing. Apply migrations:\n\n  cd dissembargo-os\n  npx supabase link --project-ref YOUR_REF\n  npx supabase db push\n\nOr run all files in supabase/migrations/ via the Supabase SQL Editor (in order).\n`,
+    : `\n${missing} table(s) missing. Apply migrations:\n\n  Quick fix for Inbox: open supabase/paste-inbox-migrations.sql\n  Copy the entire file → Supabase Dashboard → SQL Editor → Run\n\n  Or apply all migrations:\n  cd dissembargo-os\n  npx supabase link --project-ref YOUR_REF\n  npx supabase db push\n\nOr run all files in supabase/migrations/ via the Supabase SQL Editor (in order).\n`,
 );
 
 process.exit(missing > 0 ? 1 : 0);
