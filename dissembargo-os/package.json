@@ -1,0 +1,44 @@
+{
+  "name": "dissembargo-os",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "auth:verify": "node scripts/verify-auth.mjs",
+    "auth:setup": "node scripts/setup-auth-env.mjs",
+    "gmail:verify": "node scripts/verify-gmail.mjs",
+    "setup": "node scripts/full-setup.mjs",
+    "db:check": "node scripts/check-schema.mjs",
+    "db:apply": "node scripts/apply-migrations-pg.mjs",
+    "db:push": "supabase db push",
+    "db:bundle": "node scripts/bundle-migrations.mjs",
+    "db:inbox": "node -e \"console.log('Open supabase/paste-inbox-migrations.sql — copy all → Supabase SQL Editor → Run')\"",
+    "db:inbox:apply": "node scripts/apply-inbox-migration.mjs",
+    "db:types": "supabase gen types typescript --local > src/types/database.generated.ts"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.2",
+    "googleapis": "^173.0.0",
+    "lucide-react": "^1.22.0",
+    "next": "16.2.9",
+    "openai": "^6.45.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9",
+    "pg": "^8.22.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
