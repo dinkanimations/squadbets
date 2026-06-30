@@ -42,8 +42,8 @@ export async function getSchedulesFiltered(
       *,
       company:companies (id, company_name),
       opportunity:opportunities (id, subject),
-      quote:quotes (id, quote_number),
-      project:projects (id, project_name)
+      quote:quotes!quote_id (id, quote_number),
+      project:projects!project_id (id, project_name)
     `,
         { count: "exact" },
       )
@@ -79,8 +79,8 @@ export async function getScheduleFullById(id: string): Promise<ScheduleFull> {
         *,
         company:companies (id, company_name),
         opportunity:opportunities (id, subject),
-        quote:quotes (id, quote_number),
-        project:projects (id, project_name)
+        quote:quotes!quote_id (id, quote_number),
+        project:projects!project_id (id, project_name)
       `,
       )
       .eq("id", id)
