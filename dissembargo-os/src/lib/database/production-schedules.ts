@@ -185,6 +185,7 @@ export async function getUpcomingMilestones(limit = 5) {
       projectTitle: string;
       milestoneLabel: string;
       milestoneType: string;
+      milestoneColor: string;
       date: string;
     }> = [];
 
@@ -196,7 +197,8 @@ export async function getUpcomingMilestones(limit = 5) {
             scheduleId: schedule.id,
             projectTitle: schedule.project_title,
             milestoneLabel: milestone.label,
-            milestoneType: milestone.type,
+            milestoneType: milestone.type ?? "other",
+            milestoneColor: milestone.color,
             date: milestone.date,
           });
         }

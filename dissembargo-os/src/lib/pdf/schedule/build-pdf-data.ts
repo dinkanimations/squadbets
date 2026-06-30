@@ -5,7 +5,10 @@ import {
   parseDate,
   parseScheduleData,
 } from "@/lib/production-schedules/calculations";
-import { MILESTONE_COLORS } from "@/lib/production-schedules/constants";
+import {
+  resolveMilestoneColor,
+  sortMilestones,
+} from "@/lib/production-schedules/milestone-utils";
 import { getPdfBrand } from "@/lib/settings/loader";
 import { formatPdfDate } from "@/lib/pdf/quote/styles";
 import { PDF_PHASE_COLORS } from "./constants";
@@ -61,20 +64,24 @@ export async function buildSchedulePdfData(
     };
   });
 
-  const milestones = scheduleData.milestones.map((milestone) => ({
-    id: milestone.id,
-    type: milestone.type,
-    label: milestone.label,
-    date: milestone.date,
-    color:
-      milestone.color ??
-      scheduleData.milestoneLegend[milestone.type] ??
-      MILESTONE_COLORS[milestone.type],
-    leftPercent: toPercent(
-      daysFromStart(startDate, milestone.date),
-      totalDurationDays,
-    ),
-  }));
+  const milestones = sortMilestones(scheduleData.milestones)
+    .filter((milestone) => milestone.visibleInPdf !== false)
+    .map((milestone) => ({
+      id: milestone.id,
+      type: milestone.type,
+      label: milestone.label,
+      date: milestone.date,
+      color: resolveMilestoneColor(milestone, scheduleData.milestoneLegend),
+      leftPercent: toPercent(
+        daysFromStart(startDate, milestone.date),
+        totalDurationDays,
+      ),
+      shape: milestone.shape ?? "diamond",
+      icon: milestone.icon ?? null,
+      visibleInPdf: milestone.visibleInPdf !== false,
+      notes: milestone.notes,
+      sortOrder: milestone.sortOrder,
+    }));
 
   const deliverables = (schedule.deliverables ?? []).filter((item) =>
     item.trim(),

@@ -3,6 +3,7 @@ import {
   formatDateISO,
   parseDate,
 } from "@/lib/production-schedules/calculations";
+import { snapDateToWeekStart } from "@/lib/production-schedules/milestone-utils";
 
 export const TIMELINE_DAY_WIDTH = 26;
 export const TIMELINE_LABEL_WIDTH = 132;
@@ -39,4 +40,15 @@ export function snapTimelineOffset(
   dayWidth = TIMELINE_DAY_WIDTH,
 ): number {
   return Math.round(offsetPx / dayWidth) * dayWidth;
+}
+
+export function snapTimelineOffsetToWeek(
+  offsetPx: number,
+  startDate: string,
+  deliveryDate: string,
+  dayWidth = TIMELINE_DAY_WIDTH,
+): number {
+  const rawDate = timelineOffsetToDate(offsetPx, startDate, dayWidth);
+  const snappedDate = snapDateToWeekStart(rawDate, startDate, deliveryDate);
+  return dateToTimelineOffset(snappedDate, startDate, dayWidth);
 }

@@ -120,25 +120,32 @@ export function generateScheduleData(input: {
   phases.sort((a, b) => a.sortOrder - b.sortOrder);
 
   const milestones: ScheduleMilestone[] = [
-    createMilestone("kick_off", input.startDate, 0),
+    createMilestone("kick_off", input.startDate, 0, "Kick Off"),
   ];
 
-  const wipPhases = phases.filter((phase) =>
-    ["Design", "Animation", "Rendering", "Compositing"].some((name) =>
-      phase.name.includes(name),
-    ),
-  );
-
-  wipPhases.forEach((phase) => {
+  const designPhase = phases.find((phase) => phase.name.includes("Design"));
+  if (designPhase) {
     milestones.push(
       createMilestone(
         "wip_review",
-        phase.endDate,
+        designPhase.endDate,
         milestones.length,
-        `WIP Review — ${phase.name}`,
+        "Design Review",
       ),
     );
-  });
+  }
+
+  const animationPhase = phases.find((phase) => phase.name.includes("Animation"));
+  if (animationPhase) {
+    milestones.push(
+      createMilestone(
+        "wip_review",
+        animationPhase.endDate,
+        milestones.length,
+        "Animation WIP",
+      ),
+    );
+  }
 
   const clientReviewPhases = phases.filter((phase) =>
     phase.name.includes("Client Review"),
@@ -150,7 +157,9 @@ export function generateScheduleData(input: {
         "client_feedback",
         phase.startDate,
         milestones.length,
-        `Client Feedback ${index + 1}`,
+        clientReviewPhases.length > 1
+          ? `Client Feedback ${index + 1}`
+          : "Client Feedback",
       ),
     );
     milestones.push(
@@ -158,13 +167,41 @@ export function generateScheduleData(input: {
         "client_approval",
         phase.endDate,
         milestones.length,
-        `Client Approval ${index + 1}`,
+        clientReviewPhases.length > 1
+          ? `Animation Sign-off ${index + 1}`
+          : "Animation Sign-off",
       ),
     );
   });
 
+  const lightingPhase = phases.find((phase) => phase.name.includes("Lighting"));
+  if (lightingPhase) {
+    milestones.push(
+      createMilestone(
+        "wip_review",
+        lightingPhase.endDate,
+        milestones.length,
+        "Lighting Review",
+      ),
+    );
+  }
+
+  const compositingPhase = phases.find((phase) =>
+    phase.name.includes("Compositing"),
+  );
+  if (compositingPhase) {
+    milestones.push(
+      createMilestone(
+        "client_approval",
+        compositingPhase.endDate,
+        milestones.length,
+        "Final Sign-off",
+      ),
+    );
+  }
+
   milestones.push(
-    createMilestone("final_delivery", input.deliveryDate, milestones.length),
+    createMilestone("final_delivery", input.deliveryDate, milestones.length, "Delivery"),
   );
 
   return { phases, milestones };

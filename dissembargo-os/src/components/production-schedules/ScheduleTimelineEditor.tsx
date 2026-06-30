@@ -4,8 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
-  MILESTONE_TYPE_LABELS,
-  MILESTONE_TYPES,
   createEmptyMilestone,
   createEmptyPhase,
   createShutdownPeriod,
@@ -20,6 +18,10 @@ import {
   formatScheduleDate,
 } from "@/lib/production-schedules/calculations";
 import {
+  placeMilestonesByWeek,
+  snapDateToWeekStart,
+} from "@/lib/production-schedules/milestone-utils";
+import {
   resizePhaseFromStart,
   resizePhaseToEnd,
   shiftPhaseDates,
@@ -30,9 +32,11 @@ import {
   dateToTimelineOffset,
   durationToWidth,
   snapTimelineOffset,
+  snapTimelineOffsetToWeek,
   timelineOffsetToDate,
 } from "@/lib/production-schedules/timeline-utils";
-import type { MilestoneType } from "@/types/database";
+import { MilestoneLegendEditor } from "./MilestoneLegendEditor";
+import { MilestoneMarker } from "./MilestoneMarker";
 
 interface ScheduleTimelineEditorProps {
   startDate: string;
@@ -61,7 +65,6 @@ export function ScheduleTimelineEditor({
     workingDays,
     companyHolidays,
     shutdownPeriods,
-    milestoneLegend,
   } = scheduleData;
 
   const dragRef = useRef<DragMode | null>(null);
@@ -78,6 +81,22 @@ export function ScheduleTimelineEditor({
   );
 
   const timelineWidth = days.length * DAY_WIDTH;
+
+  const milestonePlacements = useMemo(
+    () => placeMilestonesByWeek(milestones, weeks),
+    [milestones, weeks],
+  );
+
+  const maxMilestonesPerWeek = useMemo(
+    () =>
+      milestonePlacements.reduce(
+        (max, placement) => Math.max(max, placement.weekCount),
+        1,
+      ),
+    [milestonePlacements],
+  );
+
+  const milestoneRowHeight = 20 + maxMilestonesPerWeek * 28;
 
   const updateSchedule = (patch: Partial<ScheduleData>) => {
     onChange({ ...scheduleData, ...patch });
@@ -100,6 +119,29 @@ export function ScheduleTimelineEditor({
   const handlePointerMove = (event: React.PointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
+
+    if (drag.kind === "milestone-move") {
+      const rawDelta = event.clientX - drag.startX;
+      const snappedOffset = snapTimelineOffsetToWeek(
+        Math.max(0, dateToOffset(drag.originalDate) + rawDelta),
+        startDate,
+        deliveryDate,
+        DAY_WIDTH,
+      );
+      const weekSnapped = snapDateToWeekStart(
+        offsetToDate(snappedOffset),
+        startDate,
+        deliveryDate,
+      );
+      updateMilestones(
+        milestones.map((milestone) =>
+          milestone.id === drag.milestoneId
+            ? { ...milestone, date: weekSnapped }
+            : milestone,
+        ),
+      );
+      return;
+    }
 
     const deltaPx = snapTimelineOffset(
       event.clientX - drag.startX,
@@ -148,19 +190,6 @@ export function ScheduleTimelineEditor({
       );
       return;
     }
-
-    if (drag.kind === "milestone-move") {
-      const newDate = offsetToDate(
-        Math.max(0, dateToOffset(drag.originalDate) + deltaPx),
-      );
-      updateMilestones(
-        milestones.map((milestone) =>
-          milestone.id === drag.milestoneId
-            ? { ...milestone, date: newDate }
-            : milestone,
-        ),
-      );
-    }
   };
 
   const endDrag = () => {
@@ -196,10 +225,6 @@ export function ScheduleTimelineEditor({
       ...milestones,
       createEmptyMilestone(startDate, milestones.length),
     ]);
-  };
-
-  const removeMilestone = (milestoneId: string) => {
-    updateMilestones(milestones.filter((m) => m.id !== milestoneId));
   };
 
   const toggleWorkingDay = (day: number) => {
@@ -242,7 +267,8 @@ export function ScheduleTimelineEditor({
               Production Timeline
             </h2>
             <p className="text-xs text-muted">
-              Drag to move · Drag edges to resize · Click labels to rename
+              Drag phases to move · Drag edges to resize · Drag milestone
+              diamonds to any week
             </p>
           </div>
           <div className="flex gap-2">
@@ -504,69 +530,60 @@ export function ScheduleTimelineEditor({
                 }}
               >
                 <p className="py-2 text-xs font-medium text-muted">Milestones</p>
-                <div className="relative h-16 border-t border-border">
-                  {milestones.map((milestone) => {
-                    const left = dateToOffset(milestone.date);
-                    const color =
-                      milestone.color ??
-                      milestoneLegend[milestone.type] ??
-                      "#6366f1";
+                <div
+                  className="relative border-t border-border"
+                  style={{ height: milestoneRowHeight }}
+                >
+                  {milestonePlacements.map(
+                    ({ milestone, indexInWeek, weekCount }) => {
+                      const left = dateToOffset(milestone.date);
+                      const top = 8 + indexInWeek * 28;
+                      const stackOffset =
+                        weekCount > 1
+                          ? (indexInWeek - (weekCount - 1) / 2) * 2
+                          : 0;
 
-                    return (
-                      <div
-                        key={milestone.id}
-                        className="absolute top-3"
-                        style={{ left: left + DAY_WIDTH / 2 }}
-                      >
-                        <button
-                          type="button"
-                          className={`group -translate-x-1/2 cursor-grab rounded border-2 border-white px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm active:cursor-grabbing ${
-                            activeId === milestone.id ? "ring-2 ring-accent" : ""
-                          }`}
-                          style={{ backgroundColor: color }}
-                          onPointerDown={(event) => {
-                            dragRef.current = {
-                              kind: "milestone-move",
-                              milestoneId: milestone.id,
-                              startX: event.clientX,
-                              originalDate: milestone.date,
-                            };
-                            setActiveId(milestone.id);
-                            event.currentTarget.setPointerCapture(event.pointerId);
+                      return (
+                        <div
+                          key={milestone.id}
+                          className="absolute"
+                          style={{
+                            left: left + DAY_WIDTH / 2,
+                            top: top + stackOffset,
                           }}
                         >
-                          <span className="max-w-[72px] truncate">
-                            {milestone.label}
-                          </span>
-                        </button>
-                        <div className="mt-1 flex -translate-x-1/2 justify-center gap-1">
-                          <input
-                            type="color"
-                            value={color}
-                            onChange={(event) =>
-                              updateMilestones(
-                                milestones.map((item) =>
-                                  item.id === milestone.id
-                                    ? { ...item, color: event.target.value }
-                                    : item,
-                                ),
-                              )
-                            }
-                            className="h-4 w-4 cursor-pointer border-0 bg-transparent p-0"
-                          />
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeMilestone(milestone.id)}
-                            aria-label="Delete milestone"
+                            className={`group flex -translate-x-1/2 cursor-grab flex-col items-center active:cursor-grabbing ${
+                              activeId === milestone.id ? "ring-2 ring-accent" : ""
+                            }`}
+                            onPointerDown={(event) => {
+                              dragRef.current = {
+                                kind: "milestone-move",
+                                milestoneId: milestone.id,
+                                startX: event.clientX,
+                                originalDate: milestone.date,
+                              };
+                              setActiveId(milestone.id);
+                              event.currentTarget.setPointerCapture(
+                                event.pointerId,
+                              );
+                            }}
                           >
-                            <Trash2 className="h-3 w-3 text-danger" />
-                          </Button>
+                            <MilestoneMarker
+                              color={milestone.color}
+                              shape={milestone.shape}
+                              icon={milestone.icon}
+                              label={milestone.label}
+                            />
+                            <span className="mt-1 max-w-[80px] truncate text-[9px] font-medium text-foreground">
+                              {milestone.label}
+                            </span>
+                          </button>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    },
+                  )}
                 </div>
               </div>
             </div>
@@ -574,73 +591,12 @@ export function ScheduleTimelineEditor({
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-4">
-        <h3 className="mb-3 text-sm font-semibold text-foreground">Legend</h3>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {MILESTONE_TYPES.map((type) => (
-            <div key={type} className="flex items-center gap-2">
-              <input
-                type="color"
-                value={milestoneLegend[type] ?? "#6366f1"}
-                onChange={(event) =>
-                  updateSchedule({
-                    milestoneLegend: {
-                      ...milestoneLegend,
-                      [type]: event.target.value,
-                    },
-                  })
-                }
-                className="h-6 w-6 cursor-pointer border-0 bg-transparent p-0"
-              />
-              <span className="text-xs text-muted">
-                {MILESTONE_TYPE_LABELS[type]}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 space-y-2">
-          {milestones.map((milestone) => (
-            <div key={`edit-${milestone.id}`} className="flex flex-wrap gap-2">
-              <select
-                value={milestone.type}
-                onChange={(event) =>
-                  updateMilestones(
-                    milestones.map((item) =>
-                      item.id === milestone.id
-                        ? {
-                            ...item,
-                            type: event.target.value as MilestoneType,
-                          }
-                        : item,
-                    ),
-                  )
-                }
-                className="h-8 rounded-md border border-border bg-surface-elevated px-2 text-xs"
-              >
-                {MILESTONE_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {MILESTONE_TYPE_LABELS[type]}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={milestone.label}
-                onChange={(event) =>
-                  updateMilestones(
-                    milestones.map((item) =>
-                      item.id === milestone.id
-                        ? { ...item, label: event.target.value }
-                        : item,
-                    ),
-                  )
-                }
-                className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface-elevated px-2 text-xs"
-                placeholder="Milestone label"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
+      <MilestoneLegendEditor
+        milestones={milestones}
+        weeks={weeks}
+        startDate={startDate}
+        onChange={updateMilestones}
+      />
 
       <section className="rounded-xl border border-border bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">

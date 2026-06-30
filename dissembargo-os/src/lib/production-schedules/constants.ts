@@ -45,18 +45,28 @@ export const MILESTONE_TYPES: MilestoneType[] = [
 
 export const MILESTONE_TYPE_LABELS: Record<MilestoneType, string> = {
   kick_off: "Kick Off",
-  wip_review: "WIP to Client",
-  client_feedback: "Client Feedback Due",
-  client_approval: "Client Approval Due",
+  wip_review: "WIP Review",
+  client_feedback: "Client Feedback",
+  client_approval: "Client Approval / Sign-off",
   final_delivery: "Delivery",
 };
 
 export const MILESTONE_COLORS: Record<MilestoneType, string> = {
-  kick_off: "#6366f1",
-  wip_review: "#818cf8",
-  client_feedback: "#fbbf24",
-  client_approval: "#34d399",
-  final_delivery: "#f87171",
+  kick_off: "#3b82f6",
+  wip_review: "#a855f7",
+  client_feedback: "#eab308",
+  client_approval: "#22c55e",
+  final_delivery: "#ef4444",
+};
+
+export const MILESTONE_SHAPES = ["diamond", "circle", "square"] as const;
+
+export type MilestoneShape = (typeof MILESTONE_SHAPES)[number];
+
+export const MILESTONE_SHAPE_LABELS: Record<MilestoneShape, string> = {
+  diamond: "Diamond",
+  circle: "Circle",
+  square: "Square",
 };
 
 export const PHASE_WEIGHTS: Record<string, number> = {
@@ -86,12 +96,16 @@ export type SchedulePhase = {
 
 export type ScheduleMilestone = {
   id: string;
-  type: MilestoneType;
+  /** @deprecated Legacy type hint — colour and label are user-controlled */
+  type?: MilestoneType;
   label: string;
   date: string;
   sortOrder: number;
   notes: string;
-  color?: string;
+  color: string;
+  icon?: string | null;
+  shape?: MilestoneShape;
+  visibleInPdf?: boolean;
 };
 
 export type ScheduleShutdownPeriod = {
@@ -134,10 +148,9 @@ export function normalizeScheduleData(data: Partial<ScheduleData>): ScheduleData
       ...phase,
       color: phase.color ?? PHASE_COLORS[index % PHASE_COLORS.length],
     })),
-    milestones: (data.milestones ?? []).map((milestone) => ({
-      ...milestone,
-      color: milestone.color ?? MILESTONE_COLORS[milestone.type],
-    })),
+    milestones: (data.milestones ?? []).map((milestone, index) =>
+      normalizeMilestone(milestone, index, data.milestoneLegend),
+    ),
     workingDays: data.workingDays?.length
       ? data.workingDays
       : [...DEFAULT_WORKING_DAYS],
@@ -228,20 +241,53 @@ export function createEmptyPhase(
   };
 }
 
+export function normalizeMilestone(
+  milestone: Partial<ScheduleMilestone> & { id: string },
+  index: number,
+  milestoneLegend?: Partial<Record<MilestoneType, string>>,
+): ScheduleMilestone {
+  const type = milestone.type;
+  const color =
+    milestone.color?.trim() ||
+    (type && milestoneLegend?.[type]) ||
+    (type ? MILESTONE_COLORS[type] : "#6366f1");
+
+  return {
+    id: milestone.id,
+    type,
+    label: milestone.label ?? "Milestone",
+    date: milestone.date ?? new Date().toISOString().split("T")[0],
+    sortOrder: milestone.sortOrder ?? index,
+    notes: milestone.notes ?? "",
+    color,
+    icon: milestone.icon ?? null,
+    shape: milestone.shape ?? "diamond",
+    visibleInPdf: milestone.visibleInPdf !== false,
+  };
+}
+
 export function createEmptyMilestone(
   date: string,
   sortOrder: number,
-  type: MilestoneType = "wip_review",
+  overrides?: Partial<
+    Pick<ScheduleMilestone, "label" | "color" | "type" | "shape" | "icon">
+  >,
 ): ScheduleMilestone {
-  return {
-    id: crypto.randomUUID(),
-    type,
-    label: MILESTONE_TYPE_LABELS[type],
-    date,
+  const type = overrides?.type ?? "wip_review";
+  return normalizeMilestone(
+    {
+      id: crypto.randomUUID(),
+      type,
+      label: overrides?.label ?? "New Milestone",
+      date,
+      sortOrder,
+      color: overrides?.color ?? MILESTONE_COLORS[type],
+      shape: overrides?.shape ?? "diamond",
+      icon: overrides?.icon ?? null,
+      ...overrides,
+    },
     sortOrder,
-    notes: "",
-    color: MILESTONE_COLORS[type],
-  };
+  );
 }
 
 export function createShutdownPeriod(

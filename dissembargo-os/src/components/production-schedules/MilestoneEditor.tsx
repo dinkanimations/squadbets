@@ -1,17 +1,11 @@
 "use client";
 
 import type { ScheduleMilestone } from "@/lib/production-schedules/constants";
-import {
-  MILESTONE_COLORS,
-  MILESTONE_TYPE_LABELS,
-  MILESTONE_TYPES,
-} from "@/lib/production-schedules/constants";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Plus, Trash2 } from "lucide-react";
-import type { MilestoneType } from "@/types/database";
+import { createEmptyMilestone } from "@/lib/production-schedules/constants";
 
 interface MilestoneEditorProps {
   milestones: ScheduleMilestone[];
@@ -33,14 +27,10 @@ export function MilestoneEditor({
   const add = () => {
     onChange([
       ...milestones,
-      {
-        id: crypto.randomUUID(),
-        type: "wip_review",
-        label: "New Milestone",
-        date: new Date().toISOString().split("T")[0],
-        sortOrder: milestones.length,
-        notes: "",
-      },
+      createEmptyMilestone(
+        new Date().toISOString().split("T")[0],
+        milestones.length,
+      ),
     ]);
   };
 
@@ -69,24 +59,13 @@ export function MilestoneEditor({
           >
             <div
               className="mt-6 h-3 w-3 rounded-full"
-              style={{ backgroundColor: MILESTONE_COLORS[milestone.type] }}
-              title={MILESTONE_TYPE_LABELS[milestone.type]}
+              style={{ backgroundColor: milestone.color }}
+              title={milestone.label}
             />
             <Input
               label={index === 0 ? "Label" : undefined}
               value={milestone.label}
               onChange={(e) => update(milestone.id, { label: e.target.value })}
-            />
-            <Select
-              label={index === 0 ? "Type" : undefined}
-              value={milestone.type}
-              onChange={(e) =>
-                update(milestone.id, { type: e.target.value as MilestoneType })
-              }
-              options={MILESTONE_TYPES.map((type) => ({
-                value: type,
-                label: MILESTONE_TYPE_LABELS[type],
-              }))}
             />
             <Input
               label={index === 0 ? "Date" : undefined}

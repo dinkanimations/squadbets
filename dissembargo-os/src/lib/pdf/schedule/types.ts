@@ -1,5 +1,6 @@
 import type { MilestoneType } from "@/types/database";
 import type { PdfBrandConfig } from "@/lib/settings/types";
+import type { MilestoneShape } from "@/lib/production-schedules/constants";
 
 export type SchedulePdfPhase = {
   id: string;
@@ -14,11 +15,16 @@ export type SchedulePdfPhase = {
 
 export type SchedulePdfMilestone = {
   id: string;
-  type: MilestoneType;
+  type?: MilestoneType;
   label: string;
   date: string;
   color: string;
   leftPercent: number;
+  shape: MilestoneShape;
+  icon?: string | null;
+  visibleInPdf: boolean;
+  notes?: string;
+  sortOrder: number;
 };
 
 export type SchedulePdfWeek = {
