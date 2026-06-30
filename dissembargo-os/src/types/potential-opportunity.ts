@@ -1,6 +1,10 @@
 import type { InboxItemType, Json } from "@/types/database";
 
-export type PotentialOpportunityStatus = "pending" | "accepted" | "dismissed";
+export type PotentialOpportunityStatus =
+  | "pending"
+  | "accepted"
+  | "dismissed"
+  | "converted";
 
 export type { InboxItemType };
 

@@ -1,14 +1,12 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type { InboxEmail } from "@/types/database";
 import { classifyEmail } from "./classify-email";
+import { createPotentialOpportunityFromInbox } from "./create-potential-opportunity";
+import { createFreelancerFromInbox } from "./create-freelancer-from-inbox";
 import {
-  createClientCommunicationFromInbox,
-  createPotentialOpportunityFromInbox,
-} from "./create-potential-opportunity";
-import { autoCreateOpportunityFromInbox } from "./auto-create-from-inbox";
-import {
-  CLIENT_COMMUNICATION_MIN_CONFIDENCE,
+  FREELANCER_MIN_CONFIDENCE,
   POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE,
+  routeToLegacyCategory,
   type AiActionTaken,
   type AiEmailCategory,
 } from "./constants";
@@ -111,10 +109,9 @@ export async function processInboxEmail(
       userId: inbox.user_id,
       inboxId,
       stage: "ai_classified",
-      message: `${result.routing_intent} (${result.confidence}%): ${result.category}`,
+      message: `${result.route} (${result.confidence}%)`,
       metadata: {
-        category: result.category,
-        routingIntent: result.routing_intent,
+        route: result.route,
         confidence: result.confidence,
         summary: result.summary,
       },
@@ -129,69 +126,42 @@ export async function processInboxEmail(
       | "ignored"
       | null = "ignored";
 
-    const isNewBusiness =
-      result.routing_intent === "new_business_enquiry" &&
+    const isPotentialOpportunity =
+      result.route === "potential_opportunity" &&
       result.confidence >= POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE;
 
-    const isClientCommunication =
-      result.routing_intent === "existing_client_communication" &&
-      result.confidence >= CLIENT_COMMUNICATION_MIN_CONFIDENCE;
+    const isFreelancer =
+      result.route === "freelancer" &&
+      result.confidence >= FREELANCER_MIN_CONFIDENCE;
 
-    if (isNewBusiness) {
-      const potential = await createPotentialOpportunityFromInbox(inbox, result);
+    if (isPotentialOpportunity) {
+      await createPotentialOpportunityFromInbox(inbox, result);
       actionTaken = "potential_opportunity";
       reviewStatus = "pending_review";
-
-      await logPipelineEvent({
-        userId: inbox.user_id,
-        inboxId,
-        stage: "potential_opportunity_created",
-        message: `Staged lead: ${potential.company_name}`,
-        metadata: {
-          potentialId: potential.id,
-          companyId: potential.company_id,
-        },
-      });
-
-      const auto = await autoCreateOpportunityFromInbox(inbox, result, potential);
-      if (auto.created) {
-        actionTaken = "auto_opportunity";
-        reviewStatus = "auto_created";
-      }
-    } else if (isClientCommunication) {
-      const potential = await createClientCommunicationFromInbox(inbox, result);
-      actionTaken = "client_communication";
+    } else if (isFreelancer) {
+      await createFreelancerFromInbox(inbox, result);
+      actionTaken = "freelancer";
       reviewStatus = "pending_review";
-
-      await logPipelineEvent({
-        userId: inbox.user_id,
-        inboxId,
-        stage: "potential_opportunity_created",
-        message: `Staged client communication: ${potential.company_name}`,
-        metadata: {
-          potentialId: potential.id,
-          itemType: "client_communication",
-        },
-      });
     } else {
       reviewStatus = "ignored";
-      actionTaken =
-        result.routing_intent === "not_relevant" ? "ignored" : "classified_only";
+      actionTaken = result.route === "other" ? "ignored" : "classified_only";
 
       await logPipelineEvent({
         userId: inbox.user_id,
         inboxId,
         stage: "ignored",
         status: "skipped",
-        message: `Not relevant: ${result.category}`,
-        metadata: { category: result.category, confidence: result.confidence },
+        message: `Other: ${result.route}`,
+        metadata: { route: result.route, confidence: result.confidence },
       });
     }
+
+    const legacyCategory = routeToLegacyCategory(result.route);
 
     await supabase
       .from("inbox")
       .update({
-        ai_category: result.category,
+        ai_category: legacyCategory,
         ai_confidence: result.confidence,
         ai_summary: result.summary,
         ai_reasoning: result.reasoning,
@@ -208,7 +178,7 @@ export async function processInboxEmail(
     await logAiClassification({
       inboxId,
       userId: inbox.user_id,
-      aiCategory: result.category,
+      aiCategory: legacyCategory,
       aiConfidence: result.confidence,
       aiSummary: result.summary,
       aiReasoning: result.reasoning,
@@ -378,8 +348,7 @@ export async function backfillPotentialOpportunities(options?: {
         failed += 1;
       } else if (
         result.actionTaken === "potential_opportunity" ||
-        result.actionTaken === "client_communication" ||
-        result.actionTaken === "auto_opportunity"
+        result.actionTaken === "freelancer"
       ) {
         potentialOpportunities += 1;
       }

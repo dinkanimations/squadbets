@@ -54,7 +54,9 @@ export async function approveReviewAction(
 
     const classification = classificationFromInboxFields(inbox, {
       company_name: companyName,
-      category: categoryValue,
+      route: isJobEnquiryCategory(categoryValue)
+        ? "potential_opportunity"
+        : "other",
     });
 
     const opportunity = await createOpportunityFromInbox(inbox, classification, {
@@ -83,7 +85,7 @@ export async function approveReviewAction(
       aiSummary: classification.summary,
       aiReasoning: "Manually approved from review queue",
       rawResponse: { manual_approval: true, companyName },
-      actionTaken: "auto_opportunity",
+      actionTaken: "potential_opportunity",
     });
 
     await logAiClassificationFeedback({

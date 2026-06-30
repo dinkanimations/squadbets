@@ -3,16 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, Mail, X } from "lucide-react";
+import { Building2, Check, Mail, X } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import type { PotentialOpportunityWithInbox } from "@/types/potential-opportunity";
 import {
-  isClientCommunicationItem,
-  isNewOpportunityItem,
-} from "@/types/potential-opportunity";
-import {
-  acceptPotentialOpportunityAction,
+  convertPotentialToCompanyAction,
   dismissPotentialOpportunityAction,
 } from "@/lib/inbox/potential-opportunity-actions";
 import { formatDate } from "@/lib/inbox/utils";
@@ -34,7 +30,7 @@ export function InboxItemCard({ item }: InboxItemCardProps) {
   const [error, setError] = useState<string | null>(null);
 
   const runAction = (
-    action: () => Promise<{ error?: string; success?: string; opportunityId?: string }>,
+    action: () => Promise<{ error?: string; companyId?: string }>,
   ) => {
     setError(null);
     startTransition(async () => {
@@ -43,8 +39,8 @@ export function InboxItemCard({ item }: InboxItemCardProps) {
         setError(result.error);
         return;
       }
-      if (result.opportunityId) {
-        router.push(`/opportunities/${result.opportunityId}`);
+      if (result.companyId) {
+        router.push(`/companies/${result.companyId}`);
         return;
       }
       router.refresh();
@@ -62,7 +58,7 @@ export function InboxItemCard({ item }: InboxItemCardProps) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/inbox/${item.id}`}
+              href={`/potential-opportunities/${item.id}`}
               className="truncate text-sm font-semibold text-foreground hover:text-accent"
             >
               {item.company_name}
@@ -70,11 +66,7 @@ export function InboxItemCard({ item }: InboxItemCardProps) {
             <Badge variant={confidenceVariant(item.ai_confidence)}>
               {Math.round(item.ai_confidence)}% confidence
             </Badge>
-            {isNewOpportunityItem(item) ? (
-              <Badge variant="success">New enquiry</Badge>
-            ) : (
-              <Badge>Client reply</Badge>
-            )}
+            <Badge variant="success">New enquiry</Badge>
             {!item.inbox.is_read && <Badge>Unread</Badge>}
           </div>
 
@@ -94,36 +86,21 @@ export function InboxItemCard({ item }: InboxItemCardProps) {
             <span>Received {formatDate(item.inbox.date_received)}</span>
           </div>
 
-          {error && (
-            <p className="mt-2 text-xs text-danger">{error}</p>
-          )}
+          {error && <p className="mt-2 text-xs text-danger">{error}</p>}
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {isNewOpportunityItem(item) ? (
-          <Button
-            size="sm"
-            disabled={isPending}
-            onClick={() =>
-              runAction(() => acceptPotentialOpportunityAction(item.id))
-            }
-          >
-            <Check className="h-4 w-4" />
-            Accept Opportunity
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            disabled={isPending}
-            onClick={() =>
-              runAction(() => acceptPotentialOpportunityAction(item.id))
-            }
-          >
-            <Check className="h-4 w-4" />
-            Create Opportunity
-          </Button>
-        )}
+        <Button
+          size="sm"
+          disabled={isPending}
+          onClick={() =>
+            runAction(() => convertPotentialToCompanyAction(item.id))
+          }
+        >
+          <Building2 className="h-4 w-4" />
+          Convert to Company
+        </Button>
         <Button
           size="sm"
           variant="secondary"
@@ -135,10 +112,10 @@ export function InboxItemCard({ item }: InboxItemCardProps) {
           <X className="h-4 w-4" />
           Dismiss
         </Button>
-        <Link href={`/inbox/${item.id}`}>
+        <Link href={`/potential-opportunities/${item.id}`}>
           <Button size="sm" variant="secondary">
             <Mail className="h-4 w-4" />
-            Open Email
+            View Details
           </Button>
         </Link>
         {item.company_id && (

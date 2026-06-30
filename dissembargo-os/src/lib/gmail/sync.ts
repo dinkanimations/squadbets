@@ -333,7 +333,7 @@ async function runInboxIntelligencePipeline(
     potentialOpportunitiesFound = pending.filter(
       (result) =>
         result.actionTaken === "potential_opportunity" ||
-        result.actionTaken === "client_communication",
+        result.actionTaken === "freelancer",
     ).length;
   } catch (error) {
     return {

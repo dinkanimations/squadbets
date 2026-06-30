@@ -164,13 +164,8 @@ function tallyResult(
 
   if (
     result.actionTaken === "potential_opportunity" ||
-    result.actionTaken === "client_communication" ||
-    result.actionTaken === "auto_opportunity"
+    result.actionTaken === "freelancer"
   ) {
     counters.leadsFound(1);
-  }
-
-  if (result.actionTaken === "auto_opportunity") {
-    counters.opportunitiesCreated(1);
   }
 }

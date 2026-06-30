@@ -9,15 +9,20 @@ import {
   Sparkles,
   Users,
   Clapperboard,
+  UserPlus,
 } from "lucide-react";
 import type { NavItem } from "@/types";
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Inbox", href: "/inbox", icon: Mail },
-  { label: "Opportunities", href: "/opportunities", icon: Sparkles },
+  {
+    label: "Potential Opportunities",
+    href: "/potential-opportunities",
+    icon: Sparkles,
+  },
   { label: "Companies", href: "/companies", icon: Building2 },
   { label: "Clients", href: "/clients", icon: Users },
+  { label: "Freelancers", href: "/freelancers", icon: UserPlus },
   { label: "Quotes", href: "/quotes", icon: FileText },
   {
     label: "Production Schedules",
@@ -25,6 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Clapperboard,
   },
   { label: "Projects", href: "/projects", icon: ClipboardList },
+  { label: "Inbox", href: "/inbox", icon: Mail },
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

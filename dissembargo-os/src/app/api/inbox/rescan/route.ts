@@ -46,7 +46,7 @@ export async function POST() {
     const leadsFound = results.filter(
       (result) =>
         result.actionTaken === "potential_opportunity" ||
-        result.actionTaken === "client_communication",
+        result.actionTaken === "freelancer",
     ).length;
     const failed = results.filter((result) => result.status === "failed").length;
     const firstFailure = results.find((result) => result.error)?.error ?? null;

@@ -17,9 +17,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader } from "@/components/ui/Card";
 import type { PotentialOpportunityWithInbox } from "@/types/potential-opportunity";
 import type { Company } from "@/types/database";
-import { isClientCommunicationItem } from "@/types/potential-opportunity";
 import {
-  acceptPotentialOpportunityAction,
+  convertPotentialToCompanyAction,
+  convertPotentialToClientAction,
+  createQuoteFromPotentialAction,
   dismissPotentialOpportunityAction,
   mergePotentialOpportunityCompanyAction,
 } from "@/lib/inbox/potential-opportunity-actions";
@@ -42,7 +43,14 @@ export function PotentialOpportunityDetail({
   const [showMerge, setShowMerge] = useState(false);
   const [mergeCompanyId, setMergeCompanyId] = useState("");
 
-  const runAction = (action: () => Promise<{ error?: string; success?: string; opportunityId?: string }>) => {
+  const runAction = (
+    action: () => Promise<{
+      error?: string;
+      success?: string;
+      companyId?: string;
+      quoteUrl?: string;
+    }>,
+  ) => {
     setMessage(null);
     setError(null);
 
@@ -54,22 +62,28 @@ export function PotentialOpportunityDetail({
       }
 
       setMessage(result.success ?? "Done.");
-      if (result.opportunityId) {
-        router.push(`/opportunities/${result.opportunityId}`);
+
+      if (result.quoteUrl) {
+        router.push(result.quoteUrl);
+        return;
+      }
+
+      if (result.companyId) {
+        router.push(`/companies/${result.companyId}`);
         return;
       }
 
       router.refresh();
-      router.push("/inbox");
+      router.push("/potential-opportunities");
     });
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/inbox">
+        <Link href="/potential-opportunities">
           <Button variant="secondary" size="sm">
-            Back to Inbox
+            Back to Potential Opportunities
           </Button>
         </Link>
         {potential.company_id && (
@@ -101,11 +115,7 @@ export function PotentialOpportunityDetail({
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Badge variant="success">{Math.round(potential.ai_confidence)}% confidence</Badge>
-          {isClientCommunicationItem(potential) ? (
-            <Badge>Client communication</Badge>
-          ) : (
-            <Badge variant="success">New business enquiry</Badge>
-          )}
+          <Badge variant="success">New business enquiry</Badge>
           <Badge>{formatDateTime(potential.inbox.date_received)}</Badge>
         </div>
 
@@ -238,13 +248,30 @@ export function PotentialOpportunityDetail({
           <Button
             disabled={isPending}
             onClick={() =>
-              runAction(() => acceptPotentialOpportunityAction(potential.id))
+              runAction(() => convertPotentialToCompanyAction(potential.id))
+            }
+          >
+            <Building2 className="h-4 w-4" />
+            Convert to Company
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={isPending}
+            onClick={() =>
+              runAction(() => createQuoteFromPotentialAction(potential.id))
             }
           >
             <Check className="h-4 w-4" />
-            {isClientCommunicationItem(potential)
-              ? "Create Opportunity"
-              : "Accept Opportunity"}
+            Create Quote
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={isPending}
+            onClick={() =>
+              runAction(() => convertPotentialToClientAction(potential.id))
+            }
+          >
+            Convert to Client
           </Button>
           <Button
             variant="secondary"

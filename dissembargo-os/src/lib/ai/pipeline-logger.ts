@@ -8,6 +8,7 @@ export const PIPELINE_STAGES = [
   "ai_sent",
   "ai_classified",
   "potential_opportunity_created",
+  "freelancer_created",
   "opportunity_created",
   "company_linked",
   "client_created",

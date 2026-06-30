@@ -1,3 +1,19 @@
+/** CRM email routing — every imported email is exactly one of these. */
+export const CRM_EMAIL_ROUTES = [
+  "potential_opportunity",
+  "freelancer",
+  "other",
+] as const;
+
+export type CrmEmailRoute = (typeof CRM_EMAIL_ROUTES)[number];
+
+export const CRM_ROUTE_LABELS: Record<CrmEmailRoute, string> = {
+  potential_opportunity: "Potential Opportunity",
+  freelancer: "Freelancer",
+  other: "Other",
+};
+
+/** @deprecated Legacy categories kept for existing inbox rows and logs */
 export const AI_EMAIL_CATEGORIES = [
   "new_business_opportunity",
   "existing_client",
@@ -34,10 +50,59 @@ export const AI_CATEGORY_LABELS: Record<AiEmailCategory, string> = {
   other: "Other",
 };
 
+export const POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE = 50;
+export const FREELANCER_MIN_CONFIDENCE = 45;
+
+export const OPENAI_MODEL = "gpt-4o-mini";
+export const PROMPT_VERSION = "v5";
+
+export type AiClassificationResult = {
+  route: CrmEmailRoute;
+  confidence: number;
+  summary: string;
+  reasoning: string;
+  signature: string | null;
+  /** Potential opportunity fields */
+  company_name: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  website: string | null;
+  project_name: string | null;
+  project_description: string | null;
+  estimated_budget: number | null;
+  requested_deliverables: string | null;
+  deadline: string | null;
+  location: string | null;
+  /** Freelancer fields */
+  freelancer_name: string | null;
+  freelancer_email: string | null;
+  role: string | null;
+  skills: string | null;
+  software: string | null;
+  portfolio_url: string | null;
+  linkedin_url: string | null;
+  day_rate: number | null;
+  availability: string | null;
+  notes: string | null;
+};
+
+export type AiActionTaken =
+  | "potential_opportunity"
+  | "freelancer"
+  | "ignored"
+  | "classified_only"
+  | "processing_failed";
+
+export type AiFeedbackAction =
+  | "approved"
+  | "rejected"
+  | "reclassified"
+  | "manual_created";
+
 export const JOB_ENQUIRY_CATEGORY: AiEmailCategory = "new_business_opportunity";
 export const EXISTING_CLIENT_CATEGORY: AiEmailCategory = "existing_client";
 
-/** Categories that should never appear in the Inbox — left in Gmail only. */
 export const IGNORED_EMAIL_CATEGORIES: AiEmailCategory[] = [
   "supplier",
   "invoice",
@@ -53,66 +118,11 @@ export const IGNORED_EMAIL_CATEGORIES: AiEmailCategory[] = [
   "other",
 ];
 
-export const AUTO_OPPORTUNITY_CONFIDENCE_THRESHOLD = 90;
-
-/** Minimum confidence to surface a new business enquiry in Inbox. */
-export const POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE = 50;
-
-/** Minimum confidence to surface an existing-client communication in Inbox. */
-export const CLIENT_COMMUNICATION_MIN_CONFIDENCE = 40;
-
-export const OPENAI_MODEL = "gpt-4o-mini";
-
-export const PROMPT_VERSION = "v4";
-
-export type InboxRoutingIntent =
-  | "new_business_enquiry"
-  | "existing_client_communication"
-  | "not_relevant";
-
-export type AiClassificationResult = {
-  category: AiEmailCategory;
-  routing_intent: InboxRoutingIntent;
-  confidence: number;
-  summary: string;
-  reasoning: string;
-  signature: string | null;
-  company_name: string | null;
-  contact_name: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  website: string | null;
-  project_name: string | null;
-  project_description: string | null;
-  estimated_budget: number | null;
-  requested_deliverables: string | null;
-  deadline: string | null;
-  location: string | null;
-};
-
-export type AiActionTaken =
-  | "auto_opportunity"
-  | "potential_opportunity"
-  | "client_communication"
-  | "ignored"
-  | "review_queue"
-  | "classified_only"
-  | "processing_failed";
-
-export type AiFeedbackAction =
-  | "approved"
-  | "rejected"
-  | "reclassified"
-  | "manual_created";
-
 export type InboxFilterCategory =
   | "all"
   | "new_business"
-  | "existing_clients"
-  | "suppliers"
-  | "invoices"
-  | "marketing"
-  | "spam"
+  | "freelancers"
+  | "other"
   | "unread";
 
 export const INBOX_FILTER_OPTIONS: Array<{
@@ -120,19 +130,16 @@ export const INBOX_FILTER_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "all", label: "All" },
-  { value: "new_business", label: "New Business" },
-  { value: "existing_clients", label: "Existing Clients" },
-  { value: "suppliers", label: "Suppliers" },
-  { value: "invoices", label: "Invoices" },
-  { value: "marketing", label: "Marketing" },
-  { value: "spam", label: "Spam" },
+  { value: "new_business", label: "Potential Opportunities" },
+  { value: "freelancers", label: "Freelancers" },
+  { value: "other", label: "Other" },
   { value: "unread", label: "Unread" },
 ];
 
-export function isJobEnquiryCategory(
+export function isIgnoredEmailCategory(
   category: AiEmailCategory | null | undefined,
 ): boolean {
-  return category === JOB_ENQUIRY_CATEGORY;
+  return category ? IGNORED_EMAIL_CATEGORIES.includes(category) : true;
 }
 
 export function isExistingClientCategory(
@@ -141,20 +148,21 @@ export function isExistingClientCategory(
   return category === EXISTING_CLIENT_CATEGORY;
 }
 
-export function isIgnoredEmailCategory(
-  category: AiEmailCategory | null | undefined,
-): boolean {
-  return category ? IGNORED_EMAIL_CATEGORIES.includes(category) : true;
+export function routeToLegacyCategory(route: CrmEmailRoute): AiEmailCategory {
+  switch (route) {
+    case "potential_opportunity":
+      return "new_business_opportunity";
+    case "freelancer":
+      return "recruitment";
+    default:
+      return "other";
+  }
 }
 
-export function routingIntentFromCategory(
-  category: AiEmailCategory,
-): InboxRoutingIntent {
-  if (category === JOB_ENQUIRY_CATEGORY) return "new_business_enquiry";
-  if (category === EXISTING_CLIENT_CATEGORY) {
-    return "existing_client_communication";
-  }
-  return "not_relevant";
+export function isJobEnquiryCategory(
+  category: AiEmailCategory | null | undefined,
+): boolean {
+  return category === "new_business_opportunity";
 }
 
 export function classificationFromInboxFields(
@@ -171,23 +179,22 @@ export function classificationFromInboxFields(
   },
   overrides: Partial<AiClassificationResult> = {},
 ): AiClassificationResult {
-  const category =
-    overrides.category ??
-    inbox.ai_category ??
-    JOB_ENQUIRY_CATEGORY;
+  const route: CrmEmailRoute =
+    overrides.route ??
+    (inbox.ai_category === "new_business_opportunity"
+      ? "potential_opportunity"
+      : inbox.ai_category === "recruitment"
+        ? "freelancer"
+        : "other");
 
   return {
-    category,
-    routing_intent:
-      overrides.routing_intent ?? routingIntentFromCategory(category),
+    route,
     confidence: overrides.confidence ?? inbox.ai_confidence ?? 0,
     summary: overrides.summary ?? inbox.ai_summary ?? "",
     reasoning: overrides.reasoning ?? inbox.ai_reasoning ?? "",
     signature: overrides.signature ?? inbox.ai_signature ?? null,
     company_name:
-      overrides.company_name ??
-      inbox.detected_company_name ??
-      null,
+      overrides.company_name ?? inbox.detected_company_name ?? null,
     contact_name: overrides.contact_name ?? inbox.sender_name ?? null,
     contact_email: overrides.contact_email ?? inbox.sender_email ?? null,
     contact_phone: overrides.contact_phone ?? null,
@@ -198,5 +205,15 @@ export function classificationFromInboxFields(
     requested_deliverables: overrides.requested_deliverables ?? null,
     deadline: overrides.deadline ?? null,
     location: overrides.location ?? null,
+    freelancer_name: overrides.freelancer_name ?? inbox.sender_name ?? null,
+    freelancer_email: overrides.freelancer_email ?? inbox.sender_email ?? null,
+    role: overrides.role ?? null,
+    skills: overrides.skills ?? null,
+    software: overrides.software ?? null,
+    portfolio_url: overrides.portfolio_url ?? null,
+    linkedin_url: overrides.linkedin_url ?? null,
+    day_rate: overrides.day_rate ?? null,
+    availability: overrides.availability ?? null,
+    notes: overrides.notes ?? null,
   };
 }

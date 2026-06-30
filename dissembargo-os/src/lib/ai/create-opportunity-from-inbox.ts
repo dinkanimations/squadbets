@@ -1,7 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type { InboxEmail } from "@/types/database";
 import type { AiClassificationResult } from "./constants";
-import { AI_CATEGORY_LABELS } from "./constants";
+import { AI_CATEGORY_LABELS, routeToLegacyCategory } from "./constants";
 import {
   findOrCreateCompany,
   findOrCreateContact,
@@ -78,7 +78,8 @@ export async function createOpportunityFromInbox(
   }
 
   const aiCategory =
-    overrides?.category || AI_CATEGORY_LABELS[classification.category];
+    overrides?.category ||
+    AI_CATEGORY_LABELS[routeToLegacyCategory(classification.route)];
 
   const estimatedBudget =
     overrides?.estimatedBudget ?? classification.estimated_budget ?? null;

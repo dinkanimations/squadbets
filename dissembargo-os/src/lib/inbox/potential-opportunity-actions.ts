@@ -8,13 +8,15 @@ import {
   getPotentialOpportunityById,
   updatePotentialOpportunity,
 } from "@/lib/database/potential-opportunities";
-import { createOpportunityFromInbox } from "@/lib/ai/create-opportunity-from-inbox";
-import {
-  classificationFromPotential,
-} from "@/lib/ai/create-potential-opportunity";
+import { classificationFromPotential } from "@/lib/ai/create-potential-opportunity";
 import { logAiClassificationFeedback } from "@/lib/database/ai-logs";
 import { getUser } from "@/lib/auth/session";
-import { AI_CATEGORY_LABELS } from "@/lib/ai/constants";
+import {
+  findOrCreateCompany,
+  findOrCreateContact,
+} from "@/lib/company-intelligence/find-or-create-company";
+import { ensureProspectClientForCompany } from "@/lib/database/clients";
+import { logPipelineEvent } from "@/lib/ai/pipeline-logger";
 import type { Database } from "@/types/database";
 
 type PotentialOpportunityUpdate =
@@ -23,7 +25,9 @@ type PotentialOpportunityUpdate =
 export type PotentialOpportunityActionState = {
   error?: string;
   success?: string;
-  opportunityId?: string;
+  companyId?: string;
+  clientId?: string;
+  quoteUrl?: string;
 };
 
 async function getCurrentUserId(): Promise<string | null> {
@@ -31,7 +35,8 @@ async function getCurrentUserId(): Promise<string | null> {
   return user?.id ?? null;
 }
 
-export async function acceptPotentialOpportunityAction(
+/** Create a Company from a potential opportunity — does NOT create a Client. */
+export async function convertPotentialToCompanyAction(
   potentialId: string,
 ): Promise<PotentialOpportunityActionState> {
   try {
@@ -44,68 +49,170 @@ export async function acceptPotentialOpportunityAction(
     const inbox = await getInboxEmailById(potential.inbox_id);
     const classification = classificationFromPotential(potential, inbox);
 
-    const categoryLabel =
-      potential.item_type === "client_communication"
-        ? AI_CATEGORY_LABELS.existing_client
-        : AI_CATEGORY_LABELS.new_business_opportunity;
-
-    const opportunity = await createOpportunityFromInbox(inbox, classification, {
-      companyId: potential.company_id ?? undefined,
-      contactId: potential.contact_id ?? undefined,
+    const company = await findOrCreateCompany({
       companyName: potential.company_name,
-      category: categoryLabel,
-      estimatedBudget: potential.estimated_budget,
-      requestedDeliverables: potential.deliverables,
+      website: potential.company_website,
+      emailBody: inbox.body_plain ?? inbox.body_html,
+      senderEmail: inbox.sender_email,
     });
 
+    const contact = await findOrCreateContact(
+      company.id,
+      potential.contact_name || classification.contact_name || "Unknown Contact",
+      potential.contact_email || classification.contact_email,
+    );
+
     const supabase = await createServiceClient();
-    const userId = await getCurrentUserId();
 
     await updatePotentialOpportunity(potentialId, {
-      status: "accepted",
-      opportunity_id: opportunity.id,
+      company_id: company.id,
+      contact_id: contact.id,
+      company_name: company.company_name,
+      company_website: company.website,
+      status: "converted",
     } satisfies PotentialOpportunityUpdate);
 
     await supabase
       .from("inbox")
       .update({
+        company_id: company.id,
+        detected_company_name: company.company_name,
+        detected_website: company.website,
         review_status: "approved",
-        opportunity_id: opportunity.id,
-        company_id: potential.company_id,
       })
       .eq("id", potential.inbox_id);
 
+    await logPipelineEvent({
+      userId: potential.user_id,
+      inboxId: potential.inbox_id,
+      stage: "company_linked",
+      message: `Converted to company: ${company.company_name}`,
+      metadata: { companyId: company.id, potentialId },
+    });
+
+    const userId = await getCurrentUserId();
     await logAiClassificationFeedback({
       inboxId: potential.inbox_id,
       userId: userId ?? potential.user_id,
-      originalCategory:
-        potential.item_type === "client_communication"
-          ? "existing_client"
-          : "new_business_opportunity",
-      correctedCategory:
-        potential.item_type === "client_communication"
-          ? "existing_client"
-          : "new_business_opportunity",
+      originalCategory: "new_business_opportunity",
+      correctedCategory: "new_business_opportunity",
       originalConfidence: potential.ai_confidence,
       feedbackAction: "approved",
-      companyNameOverride: potential.company_name,
+      companyNameOverride: company.company_name,
     });
 
-    revalidatePath("/inbox");
-    revalidatePath("/opportunities");
-    revalidatePath(`/companies/${potential.company_id}`);
-    revalidatePath("/");
+    revalidatePath("/potential-opportunities");
+    revalidatePath(`/companies/${company.id}`);
+    revalidatePath("/companies");
 
     return {
-      success: "Opportunity created.",
-      opportunityId: opportunity.id,
+      success: `Company created: ${company.company_name}`,
+      companyId: company.id,
     };
   } catch (error) {
     return {
       error:
         error instanceof Error
           ? error.message
-          : "Failed to accept potential opportunity.",
+          : "Failed to convert to company.",
+    };
+  }
+}
+
+/**
+ * Manually promote a company to Client. Normally happens after quote acceptance —
+ * this action is for explicit user control.
+ */
+export async function convertPotentialToClientAction(
+  potentialId: string,
+): Promise<PotentialOpportunityActionState> {
+  try {
+    const potential = await getPotentialOpportunityById(potentialId);
+
+    if (!potential || potential.status === "dismissed") {
+      return { error: "This potential opportunity is no longer available." };
+    }
+
+    let companyId = potential.company_id;
+
+    if (!companyId) {
+      const companyResult = await convertPotentialToCompanyAction(potentialId);
+      if (companyResult.error || !companyResult.companyId) {
+        return {
+          error:
+            companyResult.error ??
+            "Create a company first before converting to client.",
+        };
+      }
+      companyId = companyResult.companyId;
+    }
+
+    const clientId = await ensureProspectClientForCompany(companyId);
+
+    await logPipelineEvent({
+      userId: potential.user_id,
+      inboxId: potential.inbox_id,
+      stage: "client_created",
+      message: "Company promoted to client",
+      metadata: { companyId, clientId, potentialId },
+    });
+
+    revalidatePath("/potential-opportunities");
+    revalidatePath("/clients");
+    revalidatePath(`/companies/${companyId}`);
+
+    return {
+      success: "Company converted to client.",
+      companyId,
+      clientId,
+    };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to convert to client.",
+    };
+  }
+}
+
+export async function createQuoteFromPotentialAction(
+  potentialId: string,
+): Promise<PotentialOpportunityActionState> {
+  try {
+    const potential = await getPotentialOpportunityById(potentialId);
+
+    if (!potential || potential.status === "dismissed") {
+      return { error: "This potential opportunity is no longer available." };
+    }
+
+    let companyId = potential.company_id;
+
+    if (!companyId) {
+      const companyResult = await convertPotentialToCompanyAction(potentialId);
+      if (companyResult.error || !companyResult.companyId) {
+        return { error: companyResult.error ?? "Failed to create company." };
+      }
+      companyId = companyResult.companyId;
+    }
+
+    const params = new URLSearchParams({
+      companyId,
+      potentialId,
+    });
+    if (potential.contact_id) {
+      params.set("contactId", potential.contact_id);
+    }
+
+    return {
+      success: "Redirecting to quote builder…",
+      quoteUrl: `/quotes/new?${params.toString()}`,
+      companyId,
+    };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to start quote.",
     };
   }
 }
@@ -141,8 +248,8 @@ export async function dismissPotentialOpportunityAction(
       feedbackAction: "rejected",
     });
 
+    revalidatePath("/potential-opportunities");
     revalidatePath("/inbox");
-    revalidatePath("/");
 
     return { success: "Potential opportunity dismissed." };
   } catch (error) {
@@ -193,10 +300,10 @@ export async function mergePotentialOpportunityCompanyAction(
       })
       .eq("id", potential.inbox_id);
 
-    revalidatePath("/inbox");
+    revalidatePath("/potential-opportunities");
     revalidatePath(`/companies/${company.id}`);
 
-    return { success: `Linked to ${company.company_name}.` };
+    return { success: `Linked to ${company.company_name}.`, companyId: company.id };
   } catch (error) {
     return {
       error:
@@ -207,12 +314,23 @@ export async function mergePotentialOpportunityCompanyAction(
   }
 }
 
+export async function convertToCompanyAndRedirectAction(potentialId: string) {
+  const result = await convertPotentialToCompanyAction(potentialId);
+  if (result.error || !result.companyId) return result;
+  redirect(`/companies/${result.companyId}`);
+}
+
+export async function createQuoteAndRedirectAction(potentialId: string) {
+  const result = await createQuoteFromPotentialAction(potentialId);
+  if (result.error || !result.quoteUrl) return result;
+  redirect(result.quoteUrl);
+}
+
+/** @deprecated Use convertPotentialToCompanyAction */
+export async function acceptPotentialOpportunityAction(potentialId: string) {
+  return convertPotentialToCompanyAction(potentialId);
+}
+
 export async function acceptAndRedirectAction(potentialId: string) {
-  const result = await acceptPotentialOpportunityAction(potentialId);
-
-  if (result.error || !result.opportunityId) {
-    return result;
-  }
-
-  redirect(`/opportunities/${result.opportunityId}`);
+  return convertToCompanyAndRedirectAction(potentialId);
 }

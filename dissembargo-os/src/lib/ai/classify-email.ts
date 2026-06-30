@@ -1,11 +1,9 @@
 import {
-  AI_EMAIL_CATEGORIES,
+  CRM_EMAIL_ROUTES,
   OPENAI_MODEL,
   PROMPT_VERSION,
-  routingIntentFromCategory,
   type AiClassificationResult,
-  type AiEmailCategory,
-  type InboxRoutingIntent,
+  type CrmEmailRoute,
 } from "./constants";
 import { createOpenAIClient } from "./client";
 import {
@@ -25,52 +23,28 @@ interface ClassifyEmailInput {
 function buildPrompt(input: ClassifyEmailInput, signature: string | null) {
   const body = getEmailBodyForAnalysis(input.bodyPlain, input.bodyHtml);
 
-  return `You are the business development AI for Dissembargo, a creative production agency specialising in animation, CGI, rendering, and medical visualisation.
+  return `You are the CRM AI for Dissembargo, a creative production agency (animation, CGI, rendering, medical visualisation).
 
-Gmail is the source of truth. Your job is to decide whether an email deserves attention in Dissembargo OS — only genuine new business enquiries or meaningful client communications should surface. Everything else must be classified as not relevant.
+Classify each email into EXACTLY ONE route:
+- potential_opportunity: A genuine NEW business enquiry — someone asking for a quote, pricing, proposal, or creative/production work.
+- freelancer: Someone offering their services, pitching freelance work, sending a portfolio, showreel, CV, or availability — NOT a client enquiry.
+- other: Everything else — newsletters, invoices, receipts, marketing, spam, calendar invites, social notifications, internal mail, automated messages, existing client project updates, recruitment from agencies, etc.
 
-Return a JSON object with these exact keys:
-- category: one of ${AI_EMAIL_CATEGORIES.map((c) => `"${c}"`).join(", ")}
-- routing_intent: one of "new_business_enquiry", "existing_client_communication", "not_relevant"
-- confidence: number 0-100 — how likely this is genuine paid-work or actionable client communication
-- summary: one concise sentence a producer can act on, e.g. "Company is requesting a 60-second product launch animation for September. Estimated budget £20k. Awaiting quotation."
-- reasoning: brief explanation of your routing decision
+Return JSON with these exact keys:
+- route: one of ${CRM_EMAIL_ROUTES.map((r) => `"${r}"`).join(", ")}
+- confidence: number 0-100
+- summary: one actionable sentence for a producer
+- reasoning: brief explanation
+
+Potential opportunity fields (when route is potential_opportunity, else null):
+- company_name, contact_name, contact_email, contact_phone, website
+- project_name, project_description, estimated_budget, requested_deliverables, deadline, location
+
+Freelancer fields (when route is freelancer, else null):
+- freelancer_name, freelancer_email, role, skills, software, portfolio_url, website, linkedin_url, day_rate, availability, notes
+
+Shared:
 - signature: extracted email signature text, or null
-- company_name: detected company name, or null
-- contact_name: detected contact full name, or null
-- contact_email: detected contact email if different from sender, or null
-- contact_phone: phone number from signature or body, or null
-- website: detected company website URL, or null
-- project_name: short title for the requested project or campaign, or null
-- project_description: 2-4 sentence description of what the client wants, or null
-- estimated_budget: numeric budget amount mentioned (GBP/USD/EUR), or null
-- requested_deliverables: comma-separated list of requested services or creative deliverables, or null
-- deadline: any mentioned deadline or delivery date as text, or null
-- location: mentioned location, city, country, or shoot venue, or null
-
-Routing rules (understand intent, never keyword-match alone):
-- new_business_enquiry: A genuine NEW business enquiry — someone asking for a quote, pricing, proposal, creative work, animation, CGI, rendering, or production support from a company you do not already work with.
-- existing_client_communication: A reply or message from a current or past client about ongoing work, feedback, approvals, scheduling, deliverables, or project updates. Includes replies in existing email threads.
-- not_relevant: Everything else — do NOT surface these in the app.
-
-Always use not_relevant routing for:
-- newsletter, marketing, spam, invoice, receipt, password_reset, calendar, social_notification
-- supplier outreach, recruitment, internal team mail, automated notifications, promotional mail
-
-Category guide:
-- new_business_opportunity: brand-new commercial enquiry
-- existing_client: communication from a known client relationship
-- supplier: vendors, freelancers pitching services TO the agency
-- invoice / receipt: billing, payments, receipts
-- password_reset: account security, login, verification codes
-- calendar: meeting invites, calendar updates, scheduling bots
-- social_notification: LinkedIn, Twitter/X, Facebook, Instagram notifications
-- marketing: cold sales pitches and promotional outreach
-- newsletter: subscribed newsletters and digests
-- spam: junk, phishing, irrelevant bulk mail
-- recruitment: job applications and hiring
-- internal: colleagues and internal company mail
-- other: anything else not relevant to winning or delivering paid work
 
 Subject: ${input.subject ?? "(no subject)"}
 Sender Name: ${input.senderName ?? "(unknown)"}
@@ -86,30 +60,15 @@ ${
 }`;
 }
 
-function parseCategory(value: unknown): AiEmailCategory {
+function parseRoute(value: unknown): CrmEmailRoute {
   if (
-    typeof value === "string" &&
-    AI_EMAIL_CATEGORIES.includes(value as AiEmailCategory)
-  ) {
-    return value as AiEmailCategory;
-  }
-
-  return "other";
-}
-
-function parseRoutingIntent(
-  value: unknown,
-  category: AiEmailCategory,
-): InboxRoutingIntent {
-  if (
-    value === "new_business_enquiry" ||
-    value === "existing_client_communication" ||
-    value === "not_relevant"
+    value === "potential_opportunity" ||
+    value === "freelancer" ||
+    value === "other"
   ) {
     return value;
   }
-
-  return routingIntentFromCategory(category);
+  return "other";
 }
 
 function clampConfidence(value: unknown): number {
@@ -118,11 +77,16 @@ function clampConfidence(value: unknown): number {
   return Math.max(0, Math.min(100, Math.round(parsed)));
 }
 
-function parseOptionalBudget(value: unknown): number | null {
+function parseOptionalNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return Math.round(parsed * 100) / 100;
+}
+
+function str(value: unknown): string | null {
+  const s = String(value ?? "").trim();
+  return s || null;
 }
 
 export async function classifyEmail(
@@ -142,7 +106,7 @@ export async function classifyEmail(
       {
         role: "system",
         content:
-          "You are an AI business development assistant for a creative agency. Route emails to surface only genuine opportunities and client communications. Respond only with valid JSON.",
+          "You classify emails for a creative agency CRM. Respond only with valid JSON. Never route freelancer pitches as potential opportunities.",
       },
       {
         role: "user",
@@ -158,58 +122,37 @@ export async function classifyEmail(
   }
 
   const parsed = JSON.parse(content) as Record<string, unknown>;
-  const category = parseCategory(parsed.category);
 
   const result: AiClassificationResult = {
-    category,
-    routing_intent: parseRoutingIntent(parsed.routing_intent, category),
+    route: parseRoute(parsed.route),
     confidence: clampConfidence(parsed.confidence),
-    summary: String(parsed.summary ?? "").trim(),
-    reasoning: String(parsed.reasoning ?? "").trim(),
-    signature:
-      String(parsed.signature ?? "").trim() ||
-      heuristicSignature ||
-      null,
-    company_name: String(parsed.company_name ?? "").trim() || null,
-    contact_name: String(parsed.contact_name ?? "").trim() || null,
-    contact_email: String(parsed.contact_email ?? "").trim() || null,
-    contact_phone: String(parsed.contact_phone ?? "").trim() || null,
-    website: String(parsed.website ?? "").trim() || null,
-    project_name: String(parsed.project_name ?? "").trim() || null,
-    project_description: String(parsed.project_description ?? "").trim() || null,
-    estimated_budget: parseOptionalBudget(parsed.estimated_budget),
-    requested_deliverables:
-      String(parsed.requested_deliverables ?? "").trim() || null,
-    deadline: String(parsed.deadline ?? "").trim() || null,
-    location: String(parsed.location ?? "").trim() || null,
+    summary: str(parsed.summary) ?? "",
+    reasoning: str(parsed.reasoning) ?? "",
+    signature: str(parsed.signature) || heuristicSignature || null,
+    company_name: str(parsed.company_name),
+    contact_name: str(parsed.contact_name),
+    contact_email: str(parsed.contact_email),
+    contact_phone: str(parsed.contact_phone),
+    website: str(parsed.website),
+    project_name: str(parsed.project_name),
+    project_description: str(parsed.project_description),
+    estimated_budget: parseOptionalNumber(parsed.estimated_budget),
+    requested_deliverables: str(parsed.requested_deliverables),
+    deadline: str(parsed.deadline),
+    location: str(parsed.location),
+    freelancer_name: str(parsed.freelancer_name) || input.senderName,
+    freelancer_email: str(parsed.freelancer_email) || input.senderEmail,
+    role: str(parsed.role),
+    skills: str(parsed.skills),
+    software: str(parsed.software),
+    portfolio_url: str(parsed.portfolio_url),
+    linkedin_url: str(parsed.linkedin_url),
+    day_rate: parseOptionalNumber(parsed.day_rate),
+    availability: str(parsed.availability),
+    notes: str(parsed.notes),
   };
 
-  if (
-    result.routing_intent !== "not_relevant" &&
-    isIgnoredCategoryForRouting(result.category)
-  ) {
-    result.routing_intent = "not_relevant";
-  }
-
-  if (
-    result.routing_intent === "not_relevant" &&
-    result.category === "new_business_opportunity"
-  ) {
-    result.routing_intent = "new_business_enquiry";
-  }
-
-  if (
-    result.routing_intent === "not_relevant" &&
-    result.category === "existing_client"
-  ) {
-    result.routing_intent = "existing_client_communication";
-  }
-
   return { result, rawResponse: parsed };
-}
-
-function isIgnoredCategoryForRouting(category: AiEmailCategory): boolean {
-  return category !== "new_business_opportunity" && category !== "existing_client";
 }
 
 export { PROMPT_VERSION, OPENAI_MODEL };

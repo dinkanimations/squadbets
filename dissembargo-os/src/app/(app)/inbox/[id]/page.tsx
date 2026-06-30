@@ -1,32 +1,12 @@
-import { notFound } from "next/navigation";
-import { PotentialOpportunityDetail } from "@/components/inbox/PotentialOpportunityDetail";
-import { getPotentialOpportunityById } from "@/lib/database/potential-opportunities";
-import { getAllCompanies } from "@/lib/database/companies";
+import { redirect } from "next/navigation";
 
-interface InboxDetailPageProps {
+interface InboxDetailRedirectProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function InboxDetailPage({ params }: InboxDetailPageProps) {
+export default async function InboxDetailRedirect({
+  params,
+}: InboxDetailRedirectProps) {
   const { id } = await params;
-
-  try {
-    const [potential, companies] = await Promise.all([
-      getPotentialOpportunityById(id),
-      getAllCompanies(),
-    ]);
-
-    if (!potential) {
-      notFound();
-    }
-
-    return (
-      <PotentialOpportunityDetail
-        potential={potential}
-        companies={companies ?? []}
-      />
-    );
-  } catch {
-    notFound();
-  }
+  redirect(`/potential-opportunities/${id}`);
 }
