@@ -20,6 +20,7 @@ import {
   backfillPotentialOpportunities,
   rescanFailedInboxEmails,
 } from "@/lib/ai/process-inbox";
+import { logPipelineEvent } from "@/lib/ai/pipeline-logger";
 import { getFailedInboxCountForUser } from "@/lib/database/inbox-stats";
 
 export type SyncResult = {
@@ -83,6 +84,13 @@ async function importMessage(
     .maybeSingle();
 
   if (existing) {
+    await logPipelineEvent({
+      userId,
+      gmailMessageId: messageId,
+      stage: "gmail_skipped",
+      status: "skipped",
+      message: "Duplicate Gmail message",
+    });
     return { status: "skipped" as const };
   }
 
@@ -97,10 +105,25 @@ async function importMessage(
   }
 
   if (!(message.labelIds ?? []).includes("INBOX")) {
+    await logPipelineEvent({
+      userId,
+      gmailMessageId: messageId,
+      stage: "gmail_skipped",
+      status: "skipped",
+      message: "Not an INBOX message",
+    });
     return { status: "skipped" as const };
   }
 
   const parsed = parseGmailMessage(message);
+
+  await logPipelineEvent({
+    userId,
+    gmailMessageId: messageId,
+    stage: "gmail_fetched",
+    message: `Fetched Gmail message: ${parsed.subject ?? "(no subject)"}`,
+    metadata: { senderEmail: parsed.sender_email },
+  });
 
   const { data: inserted, error } = await supabase
     .from("inbox")
@@ -116,12 +139,28 @@ async function importMessage(
 
   if (error) {
     if (error.code === "23505") return { status: "skipped" as const };
+    await logPipelineEvent({
+      userId,
+      gmailMessageId: messageId,
+      stage: "failed",
+      status: "failed",
+      message: error.message,
+    });
     throw new Error(
       typeof error.message === "string"
         ? error.message
         : "Failed to save imported email",
     );
   }
+
+  await logPipelineEvent({
+    userId,
+    inboxId: inserted.id,
+    gmailMessageId: messageId,
+    stage: "gmail_saved",
+    message: `Saved to inbox: ${parsed.subject ?? "(no subject)"}`,
+    metadata: { inboxId: inserted.id },
+  });
 
   return { status: "imported" as const, inboxId: inserted.id };
 }

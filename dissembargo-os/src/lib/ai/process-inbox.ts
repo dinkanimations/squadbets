@@ -5,6 +5,7 @@ import {
   createClientCommunicationFromInbox,
   createPotentialOpportunityFromInbox,
 } from "./create-potential-opportunity";
+import { autoCreateOpportunityFromInbox } from "./auto-create-from-inbox";
 import {
   CLIENT_COMMUNICATION_MIN_CONFIDENCE,
   POTENTIAL_OPPORTUNITY_MIN_CONFIDENCE,
@@ -12,6 +13,7 @@ import {
   type AiEmailCategory,
 } from "./constants";
 import { logAiClassification } from "@/lib/database/ai-logs";
+import { logPipelineEvent } from "./pipeline-logger";
 import {
   formatThreadContext,
   inboxEmailToThreadContext,
@@ -84,6 +86,15 @@ export async function processInboxEmail(
     })
     .eq("id", inboxId);
 
+  await logPipelineEvent({
+    userId: inbox.user_id,
+    inboxId,
+    gmailMessageId: inbox.gmail_message_id,
+    stage: "ai_sent",
+    message: `Sending to OpenAI: ${inbox.subject ?? "(no subject)"}`,
+    metadata: { senderEmail: inbox.sender_email },
+  });
+
   try {
     const threadContext = await getThreadContextForInbox(inbox);
 
@@ -94,6 +105,19 @@ export async function processInboxEmail(
       bodyPlain: inbox.body_plain,
       bodyHtml: inbox.body_html,
       threadContext,
+    });
+
+    await logPipelineEvent({
+      userId: inbox.user_id,
+      inboxId,
+      stage: "ai_classified",
+      message: `${result.routing_intent} (${result.confidence}%): ${result.category}`,
+      metadata: {
+        category: result.category,
+        routingIntent: result.routing_intent,
+        confidence: result.confidence,
+        summary: result.summary,
+      },
     });
 
     let actionTaken: AiActionTaken = "ignored";
@@ -114,17 +138,54 @@ export async function processInboxEmail(
       result.confidence >= CLIENT_COMMUNICATION_MIN_CONFIDENCE;
 
     if (isNewBusiness) {
-      await createPotentialOpportunityFromInbox(inbox, result);
+      const potential = await createPotentialOpportunityFromInbox(inbox, result);
       actionTaken = "potential_opportunity";
       reviewStatus = "pending_review";
+
+      await logPipelineEvent({
+        userId: inbox.user_id,
+        inboxId,
+        stage: "potential_opportunity_created",
+        message: `Staged lead: ${potential.company_name}`,
+        metadata: {
+          potentialId: potential.id,
+          companyId: potential.company_id,
+        },
+      });
+
+      const auto = await autoCreateOpportunityFromInbox(inbox, result, potential);
+      if (auto.created) {
+        actionTaken = "auto_opportunity";
+        reviewStatus = "auto_created";
+      }
     } else if (isClientCommunication) {
-      await createClientCommunicationFromInbox(inbox, result);
+      const potential = await createClientCommunicationFromInbox(inbox, result);
       actionTaken = "client_communication";
       reviewStatus = "pending_review";
+
+      await logPipelineEvent({
+        userId: inbox.user_id,
+        inboxId,
+        stage: "potential_opportunity_created",
+        message: `Staged client communication: ${potential.company_name}`,
+        metadata: {
+          potentialId: potential.id,
+          itemType: "client_communication",
+        },
+      });
     } else {
       reviewStatus = "ignored";
       actionTaken =
         result.routing_intent === "not_relevant" ? "ignored" : "classified_only";
+
+      await logPipelineEvent({
+        userId: inbox.user_id,
+        inboxId,
+        stage: "ignored",
+        status: "skipped",
+        message: `Not relevant: ${result.category}`,
+        metadata: { category: result.category, confidence: result.confidence },
+      });
     }
 
     await supabase
@@ -159,6 +220,14 @@ export async function processInboxEmail(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "AI processing failed";
+
+    await logPipelineEvent({
+      userId: inbox.user_id,
+      inboxId,
+      stage: "failed",
+      status: "failed",
+      message,
+    });
 
     await supabase
       .from("inbox")
@@ -309,7 +378,8 @@ export async function backfillPotentialOpportunities(options?: {
         failed += 1;
       } else if (
         result.actionTaken === "potential_opportunity" ||
-        result.actionTaken === "client_communication"
+        result.actionTaken === "client_communication" ||
+        result.actionTaken === "auto_opportunity"
       ) {
         potentialOpportunities += 1;
       }
@@ -354,6 +424,8 @@ export async function reprocessInboxEmail(inboxId: string) {
 
   return processInboxEmail(inboxId);
 }
+
+export { reprocessImportedEmails, resetStuckProcessingEmails } from "./reprocess-imported-emails";
 
 export async function updateInboxAiCategory(
   inboxId: string,

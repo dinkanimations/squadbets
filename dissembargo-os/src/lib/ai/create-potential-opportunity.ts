@@ -14,6 +14,7 @@ import {
   resolveInboxEntityLinks,
   updateCompanyLastContact,
 } from "./link-inbox-entities";
+import { logPipelineEvent } from "./pipeline-logger";
 
 async function upsertInboxItem(
   inbox: InboxEmail,
@@ -115,6 +116,14 @@ export async function createPotentialOpportunityFromInbox(
     website,
     emailBody: inbox.body_plain ?? inbox.body_html,
     senderEmail: inbox.sender_email,
+  });
+
+  await logPipelineEvent({
+    userId: inbox.user_id,
+    inboxId: inbox.id,
+    stage: "company_linked",
+    message: `Company linked: ${company.company_name}`,
+    metadata: { companyId: company.id },
   });
 
   const contact = await findOrCreateContact(

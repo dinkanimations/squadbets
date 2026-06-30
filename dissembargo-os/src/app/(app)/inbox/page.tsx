@@ -11,6 +11,7 @@ import { getUserGmailConnections } from "@/lib/database/gmail-connections";
 import { checkOpenAIHealth } from "@/lib/ai/health";
 import { Button } from "@/components/ui/Button";
 import { InboxRescanButton } from "@/components/inbox/InboxRescanButton";
+import { InboxPipelinePanel } from "@/components/inbox/InboxPipelinePanel";
 import Link from "next/link";
 import InboxLoading from "./loading";
 
@@ -68,6 +69,8 @@ async function InboxContent() {
       {!inboxSchemaReady ? (
         <InboxSetupBanner projectRef={inboxProjectRef} />
       ) : null}
+
+      {connection && inboxSchemaReady && !error ? <InboxPipelinePanel /> : null}
 
       {error ? (
         <div className="rounded-xl border border-danger/20 bg-danger/10 p-6 text-sm text-danger">
@@ -130,9 +133,13 @@ function InboxEmptyState({
         title="Emails imported — scan needed"
         description={`${stats.totalImported} email${stats.totalImported === 1 ? "" : "s"} imported from Gmail, but ${needsScan} still need AI scanning before leads can appear.`}
         action={
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center gap-3">
             {quotaBanner}
             <InboxRescanButton pendingCount={needsScan} />
+            <p className="text-xs text-muted">
+              Or use the Pipeline status panel above to reprocess all imported
+              emails.
+            </p>
           </div>
         }
       />

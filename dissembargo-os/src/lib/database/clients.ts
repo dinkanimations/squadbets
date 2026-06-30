@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import type {
   Client,
   ClientInsert,
@@ -74,6 +75,39 @@ export async function getClientByCompanyId(companyId: string) {
   if (error) handleDatabaseError(error, "Failed to fetch client by company");
 
   return data as Client | null;
+}
+
+export async function ensureProspectClientForCompany(
+  companyId: string,
+): Promise<string> {
+  const supabase = await createServiceClient();
+
+  const { data: existing, error: existingError } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(`Failed to look up client: ${existingError.message}`);
+  }
+
+  if (existing) return existing.id;
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({
+      company_id: companyId,
+      client_status: "prospect",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create prospect client: ${error.message}`);
+  }
+
+  return data.id;
 }
 
 export async function createClientRecord(input: ClientInsert) {

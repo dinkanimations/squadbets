@@ -1316,6 +1316,42 @@ export interface Database {
           },
         ];
       };
+      inbox_pipeline_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          inbox_id: string | null;
+          gmail_message_id: string | null;
+          stage: string;
+          status: string;
+          message: string | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          inbox_id?: string | null;
+          gmail_message_id?: string | null;
+          stage: string;
+          status?: string;
+          message?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          inbox_id?: string | null;
+          gmail_message_id?: string | null;
+          stage?: string;
+          status?: string;
+          message?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       potential_opportunities: {
         Row: {
           id: string;

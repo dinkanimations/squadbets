@@ -7,6 +7,8 @@ import {
   findOrCreateContact,
 } from "@/lib/company-intelligence/find-or-create-company";
 import { enrichCompanyForOpportunity } from "@/lib/company-intelligence/enrich-company";
+import { getExistingOpportunityForInbox } from "./auto-create-from-inbox";
+import { logPipelineEvent } from "./pipeline-logger";
 
 export async function createOpportunityFromInbox(
   inbox: InboxEmail,
@@ -21,6 +23,16 @@ export async function createOpportunityFromInbox(
   },
 ) {
   const supabase = await createServiceClient();
+
+  const existing = await getExistingOpportunityForInbox(inbox.id);
+  if (existing) {
+    const { data } = await supabase
+      .from("opportunities")
+      .select("*")
+      .eq("id", existing.id)
+      .single();
+    if (data) return data;
+  }
 
   const companyName =
     overrides?.companyName?.trim() ||
@@ -46,6 +58,14 @@ export async function createOpportunityFromInbox(
       senderEmail: inbox.sender_email,
     });
     companyId = company.id;
+
+    await logPipelineEvent({
+      userId: inbox.user_id,
+      inboxId: inbox.id,
+      stage: "company_linked",
+      message: `Company linked: ${company.company_name}`,
+      metadata: { companyId: company.id, created: true },
+    });
   }
 
   if (!contactId) {
