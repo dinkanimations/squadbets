@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAuthClient } from "@/lib/supabase/server";
 
 export type AuthActionState = {
   error?: string;
@@ -21,11 +21,33 @@ export async function signIn(
     return { error: "Email and password are required." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  let supabase;
 
-  if (error) {
-    return { error: error.message };
+  try {
+    supabase = await createAuthClient();
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Supabase is not configured. Check environment variables.",
+    };
+  }
+
+  let authError;
+
+  try {
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    authError = result.error;
+  } catch {
+    return {
+      error:
+        "Unable to reach Supabase Auth. Verify NEXT_PUBLIC_SUPABASE_URL is correct and your project is online.",
+    };
+  }
+
+  if (authError) {
+    return { error: authError.message };
   }
 
   revalidatePath("/", "layout");
@@ -33,7 +55,7 @@ export async function signIn(
 }
 
 export async function signOut(): Promise<void> {
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login");
@@ -49,7 +71,7 @@ export async function requestPasswordReset(
     return { error: "Email is required." };
   }
 
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -80,7 +102,7 @@ export async function updatePassword(
     return { error: "Passwords do not match." };
   }
 
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {

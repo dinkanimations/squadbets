@@ -140,11 +140,20 @@ export function OpportunityDetailClient({
           </Card>
 
           <Card>
-            <CardHeader title="Internal Notes" />
+            <CardHeader title="AI Summary" />
             <p className="whitespace-pre-wrap text-sm text-muted">
-              {opportunity.notes || "No internal notes yet."}
+              {opportunity.notes || "No AI summary available."}
             </p>
           </Card>
+
+          {opportunity.requested_deliverables && (
+            <Card>
+              <CardHeader title="Requested Services" />
+              <p className="whitespace-pre-wrap text-sm text-foreground">
+                {opportunity.requested_deliverables}
+              </p>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -263,6 +272,18 @@ export function OpportunityDetailClient({
               <p className="text-sm text-muted">No contact linked.</p>
             )}
           </Card>
+
+          {opportunity.inbox_id && (
+            <Card>
+              <CardHeader title="Source Email" />
+              <Link
+                href={`/inbox/${opportunity.inbox_id}`}
+                className="text-sm text-accent hover:underline"
+              >
+                View original Gmail conversation
+              </Link>
+            </Card>
+          )}
         </div>
       </div>
 

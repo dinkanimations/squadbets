@@ -17,32 +17,39 @@ interface ClassifyEmailInput {
   senderEmail: string | null;
   bodyPlain: string | null;
   bodyHtml: string | null;
+  threadContext?: string | null;
 }
 
 function buildPrompt(input: ClassifyEmailInput, signature: string | null) {
   const body = getEmailBodyForAnalysis(input.bodyPlain, input.bodyHtml);
 
-  return `You are an AI assistant for a creative agency. Analyse the following email and classify it.
+  return `You are an AI assistant for a creative production agency specialising in animation, CGI, rendering, and medical visualisation.
+
+Analyse the ENTIRE email below — including subject, sender, body, signature, and any previous thread messages — and classify it by understanding the sender's intent and context. Do NOT rely on keyword matching alone.
 
 Return a JSON object with these exact keys:
 - category: one of ${AI_EMAIL_CATEGORIES.map((c) => `"${c}"`).join(", ")}
 - confidence: number 0-100 indicating classification confidence
 - summary: brief 1-2 sentence summary of the email
-- reasoning: explanation of why you chose this category
+- reasoning: explanation of why you chose this category based on intent
 - signature: extracted email signature text, or null
 - company_name: detected company name, or null
 - contact_name: detected contact full name, or null
 - website: detected company website URL, or null
+- estimated_budget: numeric budget amount mentioned in the email (GBP/USD/EUR), or null
+- requested_deliverables: comma-separated list of requested services or creative deliverables, or null
 
-Classification guide:
-- new_business_opportunity: genuine inbound business enquiry or project request from a potential new client
-- existing_client: communication from a current or past client
-- supplier: vendor, freelancer, or service provider outreach
-- invoice: billing, payment, or financial document
-- marketing: newsletters, promotions, cold sales pitches
-- recruitment: job applications or recruitment messages
-- spam: irrelevant, malicious, or junk mail
-- other: anything that does not fit above
+Classification guide (understand meaning, not keywords):
+- new_business_opportunity: A genuine NEW business enquiry where someone is asking about a quote, pricing, proposal, project, creative work, animation, CGI, rendering, medical visualisation, product launch visuals, or production support. This is from a potential new client, not an existing relationship.
+- existing_client: Communication from a current or past client about ongoing work, projects, or general business
+- supplier: Vendor, freelancer, subcontractor, or service provider outreach or correspondence
+- invoice: Billing, payment requests, receipts, or financial documents
+- recruitment: Job applications, hiring enquiries, or recruitment agency messages
+- marketing: Cold sales pitches, promotional outreach, or unsolicited business development (not newsletters)
+- newsletter: Subscribed newsletters, industry updates, mailing list content, or automated digest emails
+- spam: Irrelevant, malicious, phishing, or junk mail with no legitimate business purpose
+- internal: Messages from colleagues, team members, or internal company communication
+- other: Anything that does not fit the categories above
 
 Subject: ${input.subject ?? "(no subject)"}
 Sender Name: ${input.senderName ?? "(unknown)"}
@@ -50,7 +57,12 @@ Sender Email: ${input.senderEmail ?? "(unknown)"}
 Detected Signature: ${signature ?? "(none detected)"}
 
 Email Body:
-${body || "(empty body)"}`;
+${body || "(empty body)"}
+${
+  input.threadContext
+    ? `\nPrevious Thread Messages (oldest first):\n${input.threadContext}`
+    : ""
+}`;
 }
 
 function parseCategory(value: unknown): AiEmailCategory {
@@ -70,6 +82,13 @@ function clampConfidence(value: unknown): number {
   return Math.max(0, Math.min(100, Math.round(parsed)));
 }
 
+function parseOptionalBudget(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * 100) / 100;
+}
+
 export async function classifyEmail(
   input: ClassifyEmailInput,
 ): Promise<{ result: AiClassificationResult; rawResponse: Record<string, unknown> }> {
@@ -87,7 +106,7 @@ export async function classifyEmail(
       {
         role: "system",
         content:
-          "You classify business emails for a creative agency. Respond only with valid JSON.",
+          "You classify business emails for a creative agency by understanding intent and context. Respond only with valid JSON.",
       },
       {
         role: "user",
@@ -116,6 +135,9 @@ export async function classifyEmail(
     company_name: String(parsed.company_name ?? "").trim() || null,
     contact_name: String(parsed.contact_name ?? "").trim() || null,
     website: String(parsed.website ?? "").trim() || null,
+    estimated_budget: parseOptionalBudget(parsed.estimated_budget),
+    requested_deliverables:
+      String(parsed.requested_deliverables ?? "").trim() || null,
   };
 
   return { result, rawResponse: parsed };

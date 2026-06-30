@@ -1,5 +1,5 @@
 import type { AuthError } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
+import { createAuthClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
 import {
   getDevProfile,
@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth/dev-bypass";
 
 export async function getSession() {
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   const {
     data: { session },
     error,
@@ -26,7 +26,7 @@ export async function getUser() {
     return { user: getDevUser(), error: null };
   }
 
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   const {
     data: { user },
     error,
@@ -47,7 +47,7 @@ export async function getProfile(): Promise<{
     return { profile: getDevProfile(), error: null };
   }
 
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   const {
     data: { user },
     error: authError,

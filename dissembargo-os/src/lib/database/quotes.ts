@@ -79,7 +79,7 @@ export async function getQuotesFiltered(
       company:companies (id, company_name, website, logo_url),
       contact:contacts (id, full_name),
       opportunity:opportunities (id, subject),
-      project:projects (id, project_name)
+      project:projects!project_id (id, project_name)
     `,
         { count: "exact" },
       )
@@ -117,7 +117,7 @@ export async function getQuoteFullById(id: string): Promise<QuoteFull> {
       company:companies (id, company_name, website, logo_url),
       contact:contacts (id, full_name),
       opportunity:opportunities (id, subject),
-      project:projects (id, project_name)
+      project:projects!project_id (id, project_name)
     `,
     )
     .eq("id", id)

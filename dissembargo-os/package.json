@@ -7,6 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "auth:verify": "node scripts/verify-auth.mjs",
+    "auth:setup": "node scripts/setup-auth-env.mjs",
+    "gmail:verify": "node scripts/verify-gmail.mjs",
+    "setup": "node scripts/full-setup.mjs",
+    "db:check": "node scripts/check-schema.mjs",
+    "db:apply": "node scripts/apply-migrations-pg.mjs",
+    "db:push": "supabase db push",
+    "db:bundle": "node scripts/bundle-migrations.mjs",
     "db:types": "supabase gen types typescript --local > src/types/database.generated.ts"
   },
   "dependencies": {
@@ -27,6 +35,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "pg": "^8.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

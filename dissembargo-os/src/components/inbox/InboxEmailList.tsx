@@ -8,6 +8,7 @@ import {
   getSenderDisplay,
 } from "@/lib/inbox/utils";
 import { cn } from "@/lib/utils/cn";
+import { AiCategoryBadge } from "@/components/ai/AiCategoryBadge";
 
 interface InboxEmailListProps {
   emails: InboxEmail[];
@@ -27,7 +28,7 @@ export function InboxEmailList({ emails }: InboxEmailListProps) {
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <p
                   className={cn(
                     "truncate text-sm text-foreground",
@@ -37,6 +38,12 @@ export function InboxEmailList({ emails }: InboxEmailListProps) {
                   {getSenderDisplay(email)}
                 </p>
                 {!email.is_read && <Badge>Unread</Badge>}
+                {email.ai_category && (
+                  <AiCategoryBadge category={email.ai_category} />
+                )}
+                {email.review_status === "pending_review" && (
+                  <Badge variant="warning">Review</Badge>
+                )}
               </div>
               <p
                 className={cn(
@@ -47,7 +54,7 @@ export function InboxEmailList({ emails }: InboxEmailListProps) {
                 {email.subject ?? "(No subject)"}
               </p>
               <p className="mt-1 line-clamp-1 text-sm text-muted">
-                {getInboxPreview(email)}
+                {email.ai_summary ?? getInboxPreview(email)}
               </p>
             </div>
             <span className="shrink-0 text-xs text-muted">

@@ -1,45 +1,81 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServiceClient } from "@/lib/supabase/service";
 import type {
   GmailConnection,
   GmailConnectionInsert,
 } from "@/types/database";
 import type { GmailConnectionStatus } from "@/lib/gmail/constants";
-import { handleDatabaseError } from "./utils";
+import { handleDatabaseError, withDevDbFallback } from "./utils";
 
 const CONNECTION_STATUS_FIELDS =
   "id, gmail_address, last_sync_at, last_sync_status, last_sync_error";
 
-export async function getGmailConnectionStatus(): Promise<GmailConnectionStatus | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("gmail_connections")
-    .select(CONNECTION_STATUS_FIELDS)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error) handleDatabaseError(error, "Failed to fetch Gmail connection");
-
-  if (!data) return null;
-
+function toConnectionStatus(
+  row: Pick<
+    GmailConnection,
+    | "id"
+    | "gmail_address"
+    | "last_sync_at"
+    | "last_sync_status"
+    | "last_sync_error"
+  >,
+): GmailConnectionStatus {
   return {
-    ...data,
+    ...row,
     is_connected: true,
   };
 }
 
-export async function upsertGmailConnection(input: GmailConnectionInsert) {
-  const admin = createAdminClient();
+export async function getUserGmailConnections(): Promise<GmailConnectionStatus[]> {
+  return withDevDbFallback(async () => {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const { data, error } = await admin
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from("gmail_connections")
+      .select(CONNECTION_STATUS_FIELDS)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+
+    if (error) handleDatabaseError(error, "Failed to fetch Gmail connections");
+
+    return (data ?? []).map(toConnectionStatus);
+  }, []);
+}
+
+export async function getGmailConnectionStatus(): Promise<GmailConnectionStatus | null> {
+  const connections = await getUserGmailConnections();
+  return connections[0] ?? null;
+}
+
+export async function getGmailConnectionById(
+  connectionId: string,
+  userId: string,
+): Promise<GmailConnection | null> {
+  const supabase = await createServiceClient();
+
+  const { data, error } = await supabase
     .from("gmail_connections")
-    .upsert(input, { onConflict: "user_id" })
+    .select("*")
+    .eq("id", connectionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) handleDatabaseError(error, "Failed to fetch Gmail connection");
+
+  return data;
+}
+
+export async function upsertGmailConnection(input: GmailConnectionInsert) {
+  const supabase = await createServiceClient();
+
+  const { data, error } = await supabase
+    .from("gmail_connections")
+    .upsert(input, { onConflict: "user_id,gmail_address" })
     .select()
     .single();
 
@@ -48,12 +84,16 @@ export async function upsertGmailConnection(input: GmailConnectionInsert) {
   return data as GmailConnection;
 }
 
-export async function deleteGmailConnection(userId: string) {
+export async function deleteGmailConnection(
+  connectionId: string,
+  userId: string,
+) {
   const supabase = await createClient();
 
   const { error } = await supabase
     .from("gmail_connections")
     .delete()
+    .eq("id", connectionId)
     .eq("user_id", userId);
 
   if (error) handleDatabaseError(error, "Failed to disconnect Gmail");
@@ -62,9 +102,22 @@ export async function deleteGmailConnection(userId: string) {
 }
 
 export async function getAllGmailConnections() {
-  const admin = createAdminClient();
+  const supabase = await createServiceClient();
 
-  const { data, error } = await admin.from("gmail_connections").select("*");
+  const { data, error } = await supabase.from("gmail_connections").select("*");
+
+  if (error) handleDatabaseError(error, "Failed to fetch Gmail connections");
+
+  return (data ?? []) as GmailConnection[];
+}
+
+export async function getUserGmailConnectionsForSync(userId: string) {
+  const supabase = await createServiceClient();
+
+  const { data, error } = await supabase
+    .from("gmail_connections")
+    .select("*")
+    .eq("user_id", userId);
 
   if (error) handleDatabaseError(error, "Failed to fetch Gmail connections");
 

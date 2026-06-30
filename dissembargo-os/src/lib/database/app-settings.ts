@@ -2,7 +2,7 @@ import { cache } from "react";
 import { isAuthDisabled } from "@/lib/auth/dev-bypass";
 import { createClient } from "@/lib/supabase/server";
 import type { AppSettings, AppSettingsUpdate, MilestoneType } from "@/types/database";
-import { handleDatabaseError } from "./utils";
+import { handleDatabaseError, isMissingSchemaError } from "./utils";
 import type { AppSettingsData } from "@/lib/settings/types";
 import { STATIC_APP_SETTINGS } from "@/lib/settings/defaults";
 
@@ -95,25 +95,32 @@ export async function getAppSettingsRow(): Promise<AppSettings | null> {
     .eq("id", "default")
     .maybeSingle();
 
-  if (error) handleDatabaseError(error, "Failed to fetch app settings");
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      console.warn(
+        "app_settings table not found — run Supabase migrations. Using static defaults.",
+      );
+      return null;
+    }
+
+    handleDatabaseError(error, "Failed to fetch app settings");
+  }
 
   return data as AppSettings | null;
 }
 
 export async function getAppSettings(): Promise<AppSettingsData> {
-  if (isAuthDisabled()) {
-    try {
-      const row = await getAppSettingsRow();
-      if (row) return mapAppSettingsRow(row);
-    } catch {
-      // Supabase unreachable — use defaults for local UI testing.
+  try {
+    const row = await getAppSettingsRow();
+    if (!row) return STATIC_APP_SETTINGS;
+    return mapAppSettingsRow(row);
+  } catch (error) {
+    if (isAuthDisabled() || isMissingSchemaError(error as { message?: string; code?: string })) {
+      return STATIC_APP_SETTINGS;
     }
-    return STATIC_APP_SETTINGS;
-  }
 
-  const row = await getAppSettingsRow();
-  if (!row) return STATIC_APP_SETTINGS;
-  return mapAppSettingsRow(row);
+    throw error;
+  }
 }
 
 export const getCachedAppSettings = cache(getAppSettings);
@@ -128,7 +135,15 @@ export async function updateAppSettings(input: AppSettingsUpdate) {
     .select()
     .single();
 
-  if (error) handleDatabaseError(error, "Failed to update app settings");
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      throw new Error(
+        "Settings cannot be saved until database migrations are applied. Run: npx supabase db push",
+      );
+    }
+
+    handleDatabaseError(error, "Failed to update app settings");
+  }
 
   return data as AppSettings;
 }

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Select } from "@/components/ui/Select";
 import type { InboxAttachment, InboxEmail } from "@/types/database";
+import type { AiEmailCategory } from "@/types/database";
 import {
   formatDateTime,
   getSenderDisplay,
@@ -15,6 +18,16 @@ import {
   AiCategoryBadge,
   ConfidenceBadge,
 } from "@/components/ai/AiCategoryBadge";
+import {
+  AI_CATEGORY_LABELS,
+  AI_EMAIL_CATEGORIES,
+} from "@/lib/ai/constants";
+import {
+  createOpportunityFromInboxAction,
+  retryAiProcessingAction,
+  updateInboxCategoryAction,
+} from "@/lib/ai/review-actions";
+import { Input } from "@/components/ui/Input";
 
 interface InboxEmailDetailProps {
   email: InboxEmail;
@@ -43,6 +56,15 @@ function AttachmentList({ attachments }: { attachments: InboxAttachment[] }) {
 export function InboxEmailDetail({ email }: InboxEmailDetailProps) {
   const router = useRouter();
   const attachments = (email.attachments as InboxAttachment[]) ?? [];
+  const [category, setCategory] = useState<AiEmailCategory>(
+    email.ai_category ?? "other",
+  );
+  const [companyName, setCompanyName] = useState(
+    email.detected_company_name ?? email.sender_name ?? "",
+  );
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!email.is_read) {
@@ -51,6 +73,57 @@ export function InboxEmailDetail({ email }: InboxEmailDetailProps) {
       });
     }
   }, [email.id, email.is_read, router]);
+
+  const handleCategoryChange = (newCategory: AiEmailCategory) => {
+    setCategory(newCategory);
+    setError(null);
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await updateInboxCategoryAction(email.id, newCategory);
+      if (result.error) setError(result.error);
+      else {
+        setMessage(result.success ?? "Category updated.");
+        router.refresh();
+      }
+    });
+  };
+
+  const handleReprocess = () => {
+    setError(null);
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await retryAiProcessingAction(email.id);
+      if (result.error) setError(result.error);
+      else {
+        setMessage(result.success ?? "Reprocessing...");
+        router.refresh();
+      }
+    });
+  };
+
+  const handleCreateOpportunity = () => {
+    if (!companyName.trim()) {
+      setError("Company name is required.");
+      return;
+    }
+
+    setError(null);
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await createOpportunityFromInboxAction(
+        email.id,
+        companyName.trim(),
+      );
+      if (result.error) setError(result.error);
+      else {
+        setMessage(result.success ?? "Opportunity created.");
+        router.refresh();
+      }
+    });
+  };
 
   return (
     <>
@@ -79,6 +152,16 @@ export function InboxEmailDetail({ email }: InboxEmailDetailProps) {
         </Badge>
       </div>
 
+      {(message || error) && (
+        <div
+          className={`mb-4 rounded-lg px-3 py-2 text-sm ${
+            error ? "bg-danger/10 text-danger" : "bg-success/10 text-success"
+          }`}
+        >
+          {error ?? message}
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
@@ -98,13 +181,38 @@ export function InboxEmailDetail({ email }: InboxEmailDetailProps) {
 
         <div className="space-y-6">
           <Card>
-            <CardHeader title="AI Classification" />
+            <CardHeader
+              title="AI Classification"
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleReprocess}
+                  disabled={isPending}
+                  aria-label="Reprocess with AI"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              }
+            />
             {email.ai_processing_status === "completed" ? (
               <dl className="space-y-3 text-sm">
                 <div>
                   <dt className="text-muted">Category</dt>
                   <dd className="mt-1">
-                    <AiCategoryBadge category={email.ai_category} />
+                    <Select
+                      value={category}
+                      onChange={(event) =>
+                        handleCategoryChange(
+                          event.target.value as AiEmailCategory,
+                        )
+                      }
+                      options={AI_EMAIL_CATEGORIES.map((item) => ({
+                        value: item,
+                        label: AI_CATEGORY_LABELS[item],
+                      }))}
+                      disabled={isPending}
+                    />
                   </dd>
                 </div>
                 <div>
@@ -150,13 +258,43 @@ export function InboxEmailDetail({ email }: InboxEmailDetailProps) {
                 )}
               </dl>
             ) : email.ai_processing_status === "failed" ? (
-              <p className="text-sm text-danger">
-                {email.ai_processing_error ?? "AI processing failed."}
-              </p>
+              <div className="space-y-3">
+                <p className="text-sm text-danger">
+                  {email.ai_processing_error ?? "AI processing failed."}
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleReprocess}
+                  disabled={isPending}
+                >
+                  Retry AI Processing
+                </Button>
+              </div>
             ) : (
               <p className="text-sm text-muted">AI processing pending...</p>
             )}
           </Card>
+
+          {!email.opportunity_id && email.ai_processing_status === "completed" && (
+            <Card>
+              <CardHeader title="Create Opportunity" />
+              <div className="space-y-3">
+                <Input
+                  label="Company name"
+                  value={companyName}
+                  onChange={(event) => setCompanyName(event.target.value)}
+                />
+                <Button
+                  onClick={handleCreateOpportunity}
+                  disabled={isPending}
+                  className="w-full"
+                >
+                  Create Opportunity Manually
+                </Button>
+              </div>
+            </Card>
+          )}
 
           <Card>
             <CardHeader title="Attachments" />

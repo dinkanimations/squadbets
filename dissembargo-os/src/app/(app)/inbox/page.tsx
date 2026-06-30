@@ -1,35 +1,48 @@
 import { Suspense } from "react";
 import { Mail } from "lucide-react";
 import { InboxEmailList } from "@/components/inbox/InboxEmailList";
+import { InboxFilters } from "@/components/inbox/InboxFilters";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getInboxEmails } from "@/lib/database/inbox";
-import { getGmailConnectionStatus } from "@/lib/database/gmail-connections";
+import { getUserGmailConnections } from "@/lib/database/gmail-connections";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
+import type { InboxFilterCategory } from "@/lib/ai/constants";
 import InboxLoading from "./loading";
 
-export default async function InboxPage() {
+interface InboxPageProps {
+  searchParams: Promise<{ filter?: string }>;
+}
+
+export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <Suspense fallback={<InboxLoading />}>
-      <InboxContent />
+      <InboxContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function InboxContent() {
+async function InboxContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const params = await searchParams;
+  const filter = (params.filter as InboxFilterCategory | undefined) ?? "all";
+
   let emails: Awaited<ReturnType<typeof getInboxEmails>>["data"] = [];
   let error: string | null = null;
   let connection = null;
 
   try {
-    const [inboxResult, connectionResult] = await Promise.all([
-      getInboxEmails(),
-      getGmailConnectionStatus(),
+    const [inboxResult, connections] = await Promise.all([
+      getInboxEmails({ filter }),
+      getUserGmailConnections(),
     ]);
 
     emails = inboxResult.data;
-    connection = connectionResult;
+    connection = connections.length > 0 ? connections[0] : null;
   } catch (err) {
     error =
       err instanceof Error
@@ -41,7 +54,7 @@ async function InboxContent() {
     <>
       <PageHeader
         title="Inbox"
-        description="Imported Gmail emails ready for review and future AI processing."
+        description="Gmail emails classified by AI — new business enquiries become opportunities, everything else stays organised here."
         icon={Mail}
       />
 
@@ -52,25 +65,33 @@ async function InboxContent() {
       ) : !connection ? (
         <EmptyState
           title="Gmail not connected"
-          description="Connect your Gmail account in Settings to start importing inbox emails."
+          description="Connect a Gmail account in Integrations to start importing emails automatically."
           action={
-            <Link href="/settings">
-              <Button>Go to Settings</Button>
-            </Link>
-          }
-        />
-      ) : emails.length === 0 ? (
-        <EmptyState
-          title="No emails imported yet"
-          description="Your inbox will populate automatically within 5 minutes of connecting Gmail, or you can sync manually from Settings."
-          action={
-            <Link href="/settings">
-              <Button>Open Settings</Button>
+            <Link href="/settings/integrations">
+              <Button>Connect Gmail</Button>
             </Link>
           }
         />
       ) : (
-        <InboxEmailList emails={emails} />
+        <>
+          <Suspense fallback={null}>
+            <InboxFilters />
+          </Suspense>
+
+          {emails.length === 0 ? (
+            <EmptyState
+              title="No emails in this view"
+              description="Try a different filter, or sync Gmail from Integrations to import new emails."
+              action={
+                <Link href="/settings/integrations">
+                  <Button>Open Integrations</Button>
+                </Link>
+              }
+            />
+          ) : (
+            <InboxEmailList emails={emails} />
+          )}
+        </>
       )}
     </>
   );

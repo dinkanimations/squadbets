@@ -6,7 +6,12 @@ import { Badge } from "@/components/ui/Badge";
 import type { GmailConnectionStatus } from "@/lib/gmail/constants";
 
 interface IntegrationsPanelProps {
-  gmail: GmailConnectionStatus | null;
+  gmailConnections: GmailConnectionStatus[];
+  google: {
+    configured: boolean;
+    redirectUri: string;
+    serviceRoleConfigured: boolean;
+  };
   openai: { configured: boolean; model: string };
   supabase: { configured: boolean; url: string | null };
   gmailMessage?: string | null;
@@ -14,7 +19,8 @@ interface IntegrationsPanelProps {
 }
 
 export function IntegrationsPanel({
-  gmail,
+  gmailConnections,
+  google,
   openai,
   supabase,
   gmailMessage,
@@ -23,7 +29,8 @@ export function IntegrationsPanel({
   return (
     <div className="space-y-6">
       <GmailConnectionCard
-        connection={gmail}
+        connections={gmailConnections}
+        google={google}
         message={gmailMessage}
         error={gmailError}
       />

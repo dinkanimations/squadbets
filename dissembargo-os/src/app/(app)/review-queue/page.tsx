@@ -32,7 +32,7 @@ async function ReviewQueueContent() {
     <>
       <PageHeader
         title="Review Queue"
-        description="Emails flagged as potential opportunities that need human review before creating an opportunity."
+        description="New business enquiries with AI confidence below 90% — approve, reject, reclassify, or create opportunities manually."
         icon={ClipboardCheck}
       />
 
@@ -43,7 +43,7 @@ async function ReviewQueueContent() {
       ) : emails.length === 0 ? (
         <EmptyState
           title="No emails awaiting review"
-          description="Emails classified as new business opportunities with confidence below 90% will appear here for your approval."
+          description="New business enquiries classified with confidence below 90% will appear here for your approval."
         />
       ) : (
         <ReviewQueueTable emails={emails} />

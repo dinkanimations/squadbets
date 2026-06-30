@@ -14,6 +14,7 @@ import { calculateProgressFromDeliverables } from "@/lib/projects/utils";
 import {
   getPaginationRange,
   handleDatabaseError,
+  withDevDbFallback,
   type PaginationOptions,
 } from "./utils";
 
@@ -45,6 +46,7 @@ export async function getProjectsFiltered(
   filters: ProjectsFilter = {},
   options?: PaginationOptions,
 ) {
+  return withDevDbFallback(async () => {
   const supabase = await createClient();
   const { from, to } = getPaginationRange(options ?? { pageSize: 50 });
 
@@ -60,7 +62,7 @@ export async function getProjectsFiltered(
       company:companies (id, company_name),
       contact:contacts (id, full_name),
       opportunity:opportunities (id, subject),
-      quote:quotes (id, quote_number, total)
+      quote:quotes!quote_id (id, quote_number, total)
     `,
       { count: "exact" },
     )
@@ -82,6 +84,7 @@ export async function getProjectsFiltered(
   if (error) handleDatabaseError(error, "Failed to fetch projects");
 
   return { data: data as ProjectWithRelations[], count: count ?? 0 };
+  }, { data: [], count: 0 });
 }
 
 export async function getProjectFullById(id: string): Promise<ProjectFull> {
@@ -106,7 +109,7 @@ export async function getProjectFullById(id: string): Promise<ProjectFull> {
         company:companies (id, company_name),
         contact:contacts (id, full_name),
         opportunity:opportunities (id, subject),
-        quote:quotes (id, quote_number, total)
+        quote:quotes!quote_id (id, quote_number, total)
       `,
       )
       .eq("id", id)

@@ -8,9 +8,11 @@ import type { OpportunitiesFilter } from "@/lib/opportunities/constants";
 import {
   getPaginationRange,
   handleDatabaseError,
+  withDevDbFallback,
 } from "./utils";
 
 export async function getOpportunitiesFiltered(filters: OpportunitiesFilter = {}) {
+  return withDevDbFallback(async () => {
   const supabase = await createClient();
   const { from, to } = getPaginationRange({
     page: filters.page,
@@ -53,6 +55,7 @@ export async function getOpportunitiesFiltered(filters: OpportunitiesFilter = {}
       `,
         { count: "exact" },
       )
+      .not("inbox_id", "is", null)
       .or(searchFilters.join(","))
       .order("created_at", { ascending: filters.sort === "asc" })
       .range(from, to);
@@ -78,6 +81,7 @@ export async function getOpportunitiesFiltered(filters: OpportunitiesFilter = {}
     `,
       { count: "exact" },
     )
+    .not("inbox_id", "is", null)
     .order("created_at", { ascending: filters.sort === "asc" })
     .range(from, to);
 
@@ -90,6 +94,7 @@ export async function getOpportunitiesFiltered(filters: OpportunitiesFilter = {}
   if (error) handleDatabaseError(error, "Failed to fetch opportunities");
 
   return { data, count: count ?? 0 };
+  }, { data: [], count: 0 });
 }
 
 export async function countOpportunities(options?: {

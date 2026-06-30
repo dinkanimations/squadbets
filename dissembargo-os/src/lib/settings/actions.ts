@@ -312,12 +312,17 @@ export async function deleteTeamMemberAction(
 }
 
 export async function getIntegrationStatusAction() {
-  const { getGmailConnectionStatus } = await import(
+  const { getUserGmailConnections } = await import(
     "@/lib/database/gmail-connections"
   );
   const { hasOpenAIEnv } = await import("@/lib/ai/client");
+  const {
+    hasGoogleOAuthEnv,
+    getGoogleOAuthRedirectUri,
+  } = await import("@/lib/gmail/client");
+  const { hasAdminClientEnv } = await import("@/lib/supabase/admin");
 
-  const gmail = await getGmailConnectionStatus();
+  const gmail = await getUserGmailConnections();
 
   const supabaseConfigured = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -326,6 +331,11 @@ export async function getIntegrationStatusAction() {
 
   return {
     gmail,
+    google: {
+      configured: hasGoogleOAuthEnv(),
+      redirectUri: getGoogleOAuthRedirectUri(),
+      serviceRoleConfigured: hasAdminClientEnv(),
+    },
     openai: {
       configured: hasOpenAIEnv(),
       model: "gpt-4o-mini",

@@ -75,7 +75,7 @@ async function OpportunitiesContent({
     <>
       <PageHeader
         title="Opportunities"
-        description="AI-qualified opportunity inbox — review, prioritize, and action incoming business potential."
+        description="Genuine job enquiries from your inbox — automatically created or manually approved."
         icon={Inbox}
       />
 
