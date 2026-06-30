@@ -79,14 +79,25 @@ export async function refreshAccessToken(refreshToken: string) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({ refresh_token: refreshToken });
 
-  const { credentials } = await oauth2Client.refreshAccessToken();
+  try {
+    const { credentials } = await oauth2Client.refreshAccessToken();
 
-  return {
-    accessToken: credentials.access_token!,
-    expiryDate: credentials.expiry_date
-      ? new Date(credentials.expiry_date).toISOString()
-      : null,
-  };
+    if (!credentials.access_token) {
+      throw new Error(
+        "Google did not return a new access token. Disconnect and reconnect Gmail.",
+      );
+    }
+
+    return {
+      accessToken: credentials.access_token,
+      expiryDate: credentials.expiry_date
+        ? new Date(credentials.expiry_date).toISOString()
+        : null,
+    };
+  } catch (error) {
+    const { formatSyncError } = await import("./sync-errors");
+    throw new Error(formatSyncError(error));
+  }
 }
 
 export async function getGmailProfile(accessToken: string, refreshToken: string) {

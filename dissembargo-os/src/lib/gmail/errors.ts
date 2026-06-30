@@ -32,8 +32,10 @@ export function formatGmailSyncResult(data: {
   historicalImported?: number;
   backfillProcessed?: number;
   potentialOpportunitiesFound?: number;
+  aiProcessed?: number;
   error?: string;
-}): { message: string; isError: boolean } {
+  warning?: string;
+}): { message: string; isError: boolean; isWarning?: boolean } {
   if (data.status === "error") {
     return {
       isError: true,
@@ -45,6 +47,7 @@ export function formatGmailSyncResult(data: {
   const historicalImported = data.historicalImported ?? 0;
   const potentialOpportunitiesFound = data.potentialOpportunitiesFound ?? 0;
   const backfillProcessed = data.backfillProcessed ?? 0;
+  const aiProcessed = data.aiProcessed ?? 0;
 
   const parts: string[] = [];
 
@@ -64,19 +67,27 @@ export function formatGmailSyncResult(data: {
     parts.push(
       `found ${potentialOpportunitiesFound} potential opportunit${potentialOpportunitiesFound === 1 ? "y" : "ies"}`,
     );
+  } else if (aiProcessed > 0) {
+    parts.push(`processed ${aiProcessed} email${aiProcessed === 1 ? "" : "s"} with AI`);
   } else if (backfillProcessed > 0) {
     parts.push(`rescanned ${backfillProcessed} older email${backfillProcessed === 1 ? "" : "s"}`);
   }
 
-  if (parts.length === 0) {
+  const baseMessage =
+    parts.length === 0
+      ? "Sync complete — inbox is up to date."
+      : `Sync complete — ${parts.join(", ")}.`;
+
+  if (data.warning) {
     return {
       isError: false,
-      message: "Sync complete — inbox is up to date.",
+      isWarning: true,
+      message: `${baseMessage} Note: ${data.warning}`,
     };
   }
 
   return {
     isError: false,
-    message: `Sync complete — ${parts.join(", ")}.`,
+    message: baseMessage,
   };
 }

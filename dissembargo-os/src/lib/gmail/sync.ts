@@ -5,10 +5,16 @@ import {
   getGmailProfile,
   refreshAccessToken,
 } from "./client";
+import { formatSyncError } from "./sync-errors";
 import { parseGmailMessage } from "./parse";
-import { INITIAL_SYNC_MAX_MESSAGES, HISTORICAL_IMPORT_BATCH_SIZE, BACKFILL_BATCH_SIZE } from "./constants";
 import {
-  processInboxEmail,
+  INITIAL_SYNC_MAX_MESSAGES,
+  HISTORICAL_IMPORT_BATCH_SIZE,
+  BACKFILL_BATCH_SIZE,
+  SYNC_AI_PROCESS_LIMIT,
+  SYNC_HISTORICAL_IMPORT_LIMIT,
+} from "./constants";
+import {
   processPendingInboxEmails,
   backfillPotentialOpportunities,
 } from "@/lib/ai/process-inbox";
@@ -19,8 +25,10 @@ export type SyncResult = {
   historicalImported: number;
   backfillProcessed: number;
   potentialOpportunitiesFound: number;
+  aiProcessed: number;
   status: "success" | "error";
   error?: string;
+  warning?: string;
   gmailAddress?: string;
 };
 
@@ -105,7 +113,11 @@ async function importMessage(
 
   if (error) {
     if (error.code === "23505") return { status: "skipped" as const };
-    throw error;
+    throw new Error(
+      typeof error.message === "string"
+        ? error.message
+        : "Failed to save imported email",
+    );
   }
 
   return { status: "imported" as const, inboxId: inserted.id };
@@ -201,59 +213,104 @@ async function syncViaHistory(
 
 async function importMissingHistoricalMessages(
   connection: GmailConnection,
-  maxMessages = HISTORICAL_IMPORT_BATCH_SIZE,
-): Promise<{ imported: number; skipped: number }> {
+  maxMessages = SYNC_HISTORICAL_IMPORT_LIMIT,
+): Promise<{ imported: number; skipped: number; warning?: string }> {
   const supabase = await createServiceClient();
-  const { messageIds, nextPageToken } = await listInboxMessageIds(
-    connection,
-    maxMessages,
-    connection.historical_import_page_token,
-  );
-  let imported = 0;
-  let skipped = 0;
 
-  for (const messageId of messageIds) {
-    const result = await importMessage(
-      connection.user_id,
+  try {
+    const pageToken =
+      "historical_import_page_token" in connection
+        ? connection.historical_import_page_token
+        : null;
+
+    const { messageIds, nextPageToken } = await listInboxMessageIds(
       connection,
-      messageId,
+      maxMessages,
+      pageToken,
     );
+    let imported = 0;
+    let skipped = 0;
 
-    if (result.status === "imported") {
-      imported += 1;
+    for (const messageId of messageIds) {
+      const result = await importMessage(
+        connection.user_id,
+        connection,
+        messageId,
+      );
 
-      try {
-        await processInboxEmail(result.inboxId);
-      } catch (processError) {
-        console.error(
-          `AI processing failed for historical inbox ${result.inboxId}:`,
-          processError,
-        );
+      if (result.status === "imported") {
+        imported += 1;
+      } else {
+        skipped += 1;
       }
-    } else {
-      skipped += 1;
     }
+
+    try {
+      await supabase
+        .from("gmail_connections")
+        .update({ historical_import_page_token: nextPageToken })
+        .eq("id", connection.id);
+    } catch {
+      // Column may not exist until migration is applied — import still succeeded.
+    }
+
+    return { imported, skipped };
+  } catch (error) {
+    return {
+      imported: 0,
+      skipped: 0,
+      warning: `Historical import skipped: ${formatSyncError(error)}`,
+    };
   }
-
-  await supabase
-    .from("gmail_connections")
-    .update({ historical_import_page_token: nextPageToken })
-    .eq("id", connection.id);
-
-  return { imported, skipped };
 }
 
-async function runInboxIntelligencePipeline(userId: string) {
-  await processPendingInboxEmails(BACKFILL_BATCH_SIZE);
+async function runInboxIntelligencePipeline(userId: string): Promise<{
+  backfillProcessed: number;
+  potentialOpportunitiesFound: number;
+  aiProcessed: number;
+  warning?: string;
+}> {
+  let aiProcessed = 0;
+  let backfillProcessed = 0;
+  let potentialOpportunitiesFound = 0;
 
-  const backfill = await backfillPotentialOpportunities({
-    userId,
-    limit: BACKFILL_BATCH_SIZE,
-  });
+  try {
+    const pending = await processPendingInboxEmails(SYNC_AI_PROCESS_LIMIT);
+    aiProcessed = pending.length;
+    potentialOpportunitiesFound = pending.filter(
+      (result) =>
+        result.actionTaken === "potential_opportunity" ||
+        result.actionTaken === "client_communication",
+    ).length;
+  } catch (error) {
+    return {
+      aiProcessed: 0,
+      backfillProcessed: 0,
+      potentialOpportunitiesFound: 0,
+      warning: `AI processing skipped: ${formatSyncError(error)}`,
+    };
+  }
+
+  try {
+    const backfill = await backfillPotentialOpportunities({
+      userId,
+      limit: BACKFILL_BATCH_SIZE,
+    });
+    backfillProcessed = backfill.processed;
+    potentialOpportunitiesFound += backfill.potentialOpportunities;
+  } catch (error) {
+    return {
+      aiProcessed,
+      backfillProcessed,
+      potentialOpportunitiesFound,
+      warning: `Email rescan skipped: ${formatSyncError(error)}`,
+    };
+  }
 
   return {
-    backfillProcessed: backfill.processed,
-    potentialOpportunitiesFound: backfill.potentialOpportunities,
+    aiProcessed,
+    backfillProcessed,
+    potentialOpportunitiesFound,
   };
 }
 
@@ -267,6 +324,8 @@ export async function syncGmailConnection(
   let historicalImported = 0;
   let backfillProcessed = 0;
   let potentialOpportunitiesFound = 0;
+  let aiProcessed = 0;
+  let warning: string | undefined;
 
   try {
     await supabase
@@ -285,15 +344,6 @@ export async function syncGmailConnection(
 
       if (result.status === "imported") {
         imported += 1;
-
-        try {
-          await processInboxEmail(result.inboxId);
-        } catch (processError) {
-          console.error(
-            `AI processing failed for inbox ${result.inboxId}:`,
-            processError,
-          );
-        }
       } else {
         skipped += 1;
       }
@@ -302,11 +352,20 @@ export async function syncGmailConnection(
     const historical = await importMissingHistoricalMessages(connection);
     historicalImported = historical.imported;
     skipped += historical.skipped;
+    if (historical.warning) {
+      warning = historical.warning;
+    }
 
     if (!options?.skipIntelligencePipeline) {
       const pipeline = await runInboxIntelligencePipeline(connection.user_id);
       backfillProcessed = pipeline.backfillProcessed;
       potentialOpportunitiesFound = pipeline.potentialOpportunitiesFound;
+      aiProcessed = pipeline.aiProcessed;
+      if (pipeline.warning) {
+        warning = warning
+          ? `${warning} ${pipeline.warning}`
+          : pipeline.warning;
+      }
     }
 
     await supabase
@@ -315,7 +374,7 @@ export async function syncGmailConnection(
         history_id: newHistoryId,
         last_sync_at: new Date().toISOString(),
         last_sync_status: "success",
-        last_sync_error: null,
+        last_sync_error: warning ?? null,
       })
       .eq("id", connection.id);
 
@@ -325,12 +384,13 @@ export async function syncGmailConnection(
       historicalImported,
       backfillProcessed,
       potentialOpportunitiesFound,
+      aiProcessed,
       status: "success",
+      warning,
       gmailAddress: connection.gmail_address,
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Gmail sync failed";
+    const message = formatSyncError(error);
 
     await supabase
       .from("gmail_connections")
@@ -347,6 +407,7 @@ export async function syncGmailConnection(
       historicalImported,
       backfillProcessed,
       potentialOpportunitiesFound,
+      aiProcessed,
       status: "error",
       error: message,
       gmailAddress: connection.gmail_address,
@@ -375,6 +436,12 @@ export async function syncUserGmailConnections(userId: string) {
     if (last) {
       last.backfillProcessed = pipeline.backfillProcessed;
       last.potentialOpportunitiesFound = pipeline.potentialOpportunitiesFound;
+      last.aiProcessed = pipeline.aiProcessed;
+      if (pipeline.warning) {
+        last.warning = last.warning
+          ? `${last.warning} ${pipeline.warning}`
+          : pipeline.warning;
+      }
     }
   }
 

@@ -76,7 +76,11 @@ function AccountRow({
           return;
         }
 
-        setSyncMessage(result.message);
+        if (result.isWarning) {
+          setSyncError(result.message);
+        } else {
+          setSyncMessage(result.message);
+        }
         onSyncComplete();
       } catch {
         setSyncError("Unable to sync this account right now.");
@@ -186,7 +190,11 @@ export function GmailConnectionCard({
           return;
         }
 
-        setSyncAllMessage(result.message);
+        if (result.isWarning) {
+          setSyncAllError(result.message);
+        } else {
+          setSyncAllMessage(result.message);
+        }
         router.refresh();
       } catch {
         setSyncAllError("Unable to sync Gmail accounts right now.");

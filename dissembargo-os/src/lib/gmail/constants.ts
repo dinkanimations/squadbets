@@ -10,8 +10,14 @@ export const INITIAL_SYNC_MAX_MESSAGES = 100;
 /** How many Gmail inbox messages to scan per sync for older mail not yet imported. */
 export const HISTORICAL_IMPORT_BATCH_SIZE = 200;
 
+/** Per manual sync — keep small to avoid serverless timeouts. */
+export const SYNC_HISTORICAL_IMPORT_LIMIT = 40;
+
+/** How many emails to run through OpenAI per sync click. */
+export const SYNC_AI_PROCESS_LIMIT = 8;
+
 /** How many previously imported emails to reprocess per sync for potential opportunities. */
-export const BACKFILL_BATCH_SIZE = 30;
+export const BACKFILL_BATCH_SIZE = 10;
 
 export type GmailConnectionStatus = {
   id: string;
