@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   Quote,
   QuoteBudgetLineItem,
@@ -39,13 +38,13 @@ export type QuoteFull = QuoteWithRelations & {
 };
 
 export async function generateQuoteNumber(): Promise<string> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("generate_quote_number");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("generate_quote_number");
 
   if (error || !data) {
     const year = new Date().getFullYear();
     const prefix = `Q-${year}-`;
-    const { data: latest } = await admin
+    const { data: latest } = await supabase
       .from("quotes")
       .select("quote_number")
       .like("quote_number", `${prefix}%`)
@@ -232,9 +231,9 @@ export async function archiveQuote(id: string) {
 }
 
 export async function deleteQuoteChildren(quoteId: string) {
-  const admin = createAdminClient();
+  const supabase = await createClient();
 
-  const { data: sections } = await admin
+  const { data: sections } = await supabase
     .from("quote_budget_sections")
     .select("id")
     .eq("quote_id", quoteId);
@@ -242,14 +241,14 @@ export async function deleteQuoteChildren(quoteId: string) {
   const sectionIds = (sections ?? []).map((s) => s.id);
 
   if (sectionIds.length > 0) {
-    await admin
+    await supabase
       .from("quote_budget_line_items")
       .delete()
       .in("section_id", sectionIds);
   }
 
-  await admin.from("quote_budget_sections").delete().eq("quote_id", quoteId);
-  await admin.from("quote_deliverables").delete().eq("quote_id", quoteId);
+  await supabase.from("quote_budget_sections").delete().eq("quote_id", quoteId);
+  await supabase.from("quote_deliverables").delete().eq("quote_id", quoteId);
 }
 
 export async function saveQuoteChildren(
@@ -272,12 +271,12 @@ export async function saveQuoteChildren(
     }>;
   }>,
 ) {
-  const admin = createAdminClient();
+  const supabase = await createClient();
 
   await deleteQuoteChildren(quoteId);
 
   if (deliverables.length > 0) {
-    const { error } = await admin.from("quote_deliverables").insert(
+    const { error } = await supabase.from("quote_deliverables").insert(
       deliverables.map((d) => ({
         quote_id: quoteId,
         title: d.title,
@@ -291,7 +290,7 @@ export async function saveQuoteChildren(
   }
 
   for (const section of sections) {
-    const { data: sectionRow, error: sectionError } = await admin
+    const { data: sectionRow, error: sectionError } = await supabase
       .from("quote_budget_sections")
       .insert({
         quote_id: quoteId,
@@ -306,7 +305,7 @@ export async function saveQuoteChildren(
     }
 
     if (section.line_items.length > 0) {
-      const { error: itemsError } = await admin
+      const { error: itemsError } = await supabase
         .from("quote_budget_line_items")
         .insert(
           section.line_items.map((item) => ({

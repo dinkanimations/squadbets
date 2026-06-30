@@ -7,7 +7,7 @@ export function createAdminClient() {
 
   if (!url || !serviceRoleKey) {
     throw new Error(
-      "Missing SUPABASE_SERVICE_ROLE_KEY for server-side Gmail operations.",
+      "Missing SUPABASE_SERVICE_ROLE_KEY for server-side admin operations.",
     );
   }
 
