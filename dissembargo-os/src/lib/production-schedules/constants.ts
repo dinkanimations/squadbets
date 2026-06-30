@@ -11,17 +11,29 @@ export const SCHEDULE_STATUS_LABELS: Record<ScheduleStatus, string> = {
 
 export const DEFAULT_PHASES = [
   "Scoping",
-  "Research",
   "Look Development",
   "Design",
-  "Modelling",
+  "Product Check",
   "Animation",
   "Lighting",
-  "Rendering",
   "Compositing",
-  "Client Review",
+  "Rendering",
   "Final Delivery",
 ] as const;
+
+export const PHASE_COLORS = [
+  "#6366f1",
+  "#818cf8",
+  "#4f46e5",
+  "#7c3aed",
+  "#8b5cf6",
+  "#a78bfa",
+  "#c4b5fd",
+  "#312e81",
+  "#4338ca",
+  "#a5b4fc",
+  "#ddd6fe",
+];
 
 export const MILESTONE_TYPES: MilestoneType[] = [
   "kick_off",
@@ -33,10 +45,10 @@ export const MILESTONE_TYPES: MilestoneType[] = [
 
 export const MILESTONE_TYPE_LABELS: Record<MilestoneType, string> = {
   kick_off: "Kick Off",
-  wip_review: "WIP Review",
-  client_feedback: "Client Feedback",
-  client_approval: "Client Approval",
-  final_delivery: "Final Delivery",
+  wip_review: "WIP to Client",
+  client_feedback: "Client Feedback Due",
+  client_approval: "Client Approval Due",
+  final_delivery: "Delivery",
 };
 
 export const MILESTONE_COLORS: Record<MilestoneType, string> = {
@@ -47,20 +59,19 @@ export const MILESTONE_COLORS: Record<MilestoneType, string> = {
   final_delivery: "#f87171",
 };
 
-/** Relative weights for auto-distributing phase duration. */
 export const PHASE_WEIGHTS: Record<string, number> = {
   Scoping: 1,
-  Research: 1,
   "Look Development": 2,
   Design: 2,
-  Modelling: 3,
+  "Product Check": 1,
   Animation: 4,
   Lighting: 2,
-  Rendering: 2,
   Compositing: 2,
-  "Client Review": 1,
+  Rendering: 2,
   "Final Delivery": 1,
 };
+
+export const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
 
 export type SchedulePhase = {
   id: string;
@@ -70,6 +81,7 @@ export type SchedulePhase = {
   durationDays: number;
   sortOrder: number;
   notes: string;
+  color: string;
 };
 
 export type ScheduleMilestone = {
@@ -79,11 +91,25 @@ export type ScheduleMilestone = {
   date: string;
   sortOrder: number;
   notes: string;
+  color?: string;
+};
+
+export type ScheduleShutdownPeriod = {
+  id: string;
+  label: string;
+  startDate: string;
+  endDate: string;
+  color: string;
 };
 
 export type ScheduleData = {
   phases: SchedulePhase[];
   milestones: ScheduleMilestone[];
+  workingDays: number[];
+  companyHolidays: string[];
+  shutdownPeriods: ScheduleShutdownPeriod[];
+  milestoneLegend: Partial<Record<MilestoneType, string>>;
+  clientName?: string;
 };
 
 export type ScheduleFormDraft = {
@@ -92,6 +118,7 @@ export type ScheduleFormDraft = {
   quoteId: string;
   projectId: string;
   projectTitle: string;
+  clientName: string;
   startDate: string;
   deliveryDate: string;
   reviewRounds: number;
@@ -101,10 +128,45 @@ export type ScheduleFormDraft = {
   scheduleData: ScheduleData;
 };
 
+export function normalizeScheduleData(data: Partial<ScheduleData>): ScheduleData {
+  return {
+    phases: (data.phases ?? []).map((phase, index) => ({
+      ...phase,
+      color: phase.color ?? PHASE_COLORS[index % PHASE_COLORS.length],
+    })),
+    milestones: (data.milestones ?? []).map((milestone) => ({
+      ...milestone,
+      color: milestone.color ?? MILESTONE_COLORS[milestone.type],
+    })),
+    workingDays: data.workingDays?.length
+      ? data.workingDays
+      : [...DEFAULT_WORKING_DAYS],
+    companyHolidays: data.companyHolidays ?? [],
+    shutdownPeriods: data.shutdownPeriods ?? [],
+    milestoneLegend: {
+      ...MILESTONE_COLORS,
+      ...(data.milestoneLegend ?? {}),
+    },
+  };
+}
+
+export function createEmptyScheduleData(): ScheduleData {
+  return normalizeScheduleData({
+    phases: [],
+    milestones: [],
+    workingDays: [...DEFAULT_WORKING_DAYS],
+    companyHolidays: [],
+    shutdownPeriods: [],
+    milestoneLegend: { ...MILESTONE_COLORS },
+  });
+}
+
 export function createEmptyScheduleDraft(): ScheduleFormDraft {
   const today = new Date();
   const delivery = new Date(today);
   delivery.setDate(delivery.getDate() + 42);
+  const startDate = today.toISOString().split("T")[0];
+  const deliveryDate = delivery.toISOString().split("T")[0];
 
   return {
     companyId: "",
@@ -112,13 +174,14 @@ export function createEmptyScheduleDraft(): ScheduleFormDraft {
     quoteId: "",
     projectId: "",
     projectTitle: "",
-    startDate: today.toISOString().split("T")[0],
-    deliveryDate: delivery.toISOString().split("T")[0],
+    clientName: "",
+    startDate,
+    deliveryDate,
     reviewRounds: 2,
     deliverables: [""],
     notes: "",
     status: "draft",
-    scheduleData: { phases: [], milestones: [] },
+    scheduleData: createEmptyScheduleData(),
   };
 }
 
@@ -127,9 +190,9 @@ export function createEmptyScheduleDraftFromSettings(
 ): ScheduleFormDraft {
   const today = new Date();
   const delivery = new Date(today);
-  delivery.setDate(
-    delivery.getDate() + settings.defaultScheduleDurationDays,
-  );
+  delivery.setDate(delivery.getDate() + settings.defaultScheduleDurationDays);
+  const startDate = today.toISOString().split("T")[0];
+  const deliveryDate = delivery.toISOString().split("T")[0];
 
   return {
     companyId: "",
@@ -137,12 +200,59 @@ export function createEmptyScheduleDraftFromSettings(
     quoteId: "",
     projectId: "",
     projectTitle: "",
-    startDate: today.toISOString().split("T")[0],
-    deliveryDate: delivery.toISOString().split("T")[0],
+    clientName: "",
+    startDate,
+    deliveryDate,
     reviewRounds: settings.defaultReviewRounds,
     deliverables: [""],
     notes: "",
     status: "draft",
-    scheduleData: { phases: [], milestones: [] },
+    scheduleData: createEmptyScheduleData(),
+  };
+}
+
+export function createEmptyPhase(
+  startDate: string,
+  sortOrder: number,
+  color?: string,
+): SchedulePhase {
+  return {
+    id: crypto.randomUUID(),
+    name: "New Phase",
+    startDate,
+    endDate: startDate,
+    durationDays: 1,
+    sortOrder,
+    notes: "",
+    color: color ?? PHASE_COLORS[sortOrder % PHASE_COLORS.length],
+  };
+}
+
+export function createEmptyMilestone(
+  date: string,
+  sortOrder: number,
+  type: MilestoneType = "wip_review",
+): ScheduleMilestone {
+  return {
+    id: crypto.randomUUID(),
+    type,
+    label: MILESTONE_TYPE_LABELS[type],
+    date,
+    sortOrder,
+    notes: "",
+    color: MILESTONE_COLORS[type],
+  };
+}
+
+export function createShutdownPeriod(
+  startDate: string,
+  endDate: string,
+): ScheduleShutdownPeriod {
+  return {
+    id: crypto.randomUUID(),
+    label: "Company Shutdown",
+    startDate,
+    endDate,
+    color: "rgba(248, 113, 113, 0.25)",
   };
 }

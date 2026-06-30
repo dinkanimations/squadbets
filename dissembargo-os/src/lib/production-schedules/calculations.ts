@@ -1,4 +1,8 @@
-import type { ScheduleData, SchedulePhase } from "./constants";
+import {
+  normalizeScheduleData,
+  type ScheduleData,
+  type SchedulePhase,
+} from "./constants";
 
 export function parseDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
@@ -94,14 +98,56 @@ export function dateToWeekIndex(
 
 export function parseScheduleData(json: unknown): ScheduleData {
   if (!json || typeof json !== "object") {
-    return { phases: [], milestones: [] };
+    return normalizeScheduleData({});
   }
 
-  const data = json as ScheduleData;
-  return {
+  const data = json as Partial<ScheduleData>;
+  return normalizeScheduleData({
     phases: Array.isArray(data.phases) ? data.phases : [],
     milestones: Array.isArray(data.milestones) ? data.milestones : [],
-  };
+    workingDays: data.workingDays,
+    companyHolidays: data.companyHolidays,
+    shutdownPeriods: data.shutdownPeriods,
+    milestoneLegend: data.milestoneLegend,
+  });
+}
+
+export type TimelineDay = {
+  date: string;
+  dayOfWeek: number;
+  dayLabel: string;
+  dateLabel: string;
+  isWorkingDay: boolean;
+  isHoliday: boolean;
+};
+
+export function buildTimelineDays(
+  startDate: string,
+  deliveryDate: string,
+  workingDays: number[],
+  companyHolidays: string[],
+): TimelineDay[] {
+  const start = parseDate(startDate);
+  const end = parseDate(deliveryDate);
+  const days: TimelineDay[] = [];
+  const holidaySet = new Set(companyHolidays);
+  const cursor = new Date(start);
+
+  while (cursor <= end) {
+    const date = formatDateISO(cursor);
+    const dayOfWeek = cursor.getDay();
+    days.push({
+      date,
+      dayOfWeek,
+      dayLabel: cursor.toLocaleDateString("en-GB", { weekday: "narrow" }),
+      dateLabel: String(cursor.getDate()),
+      isWorkingDay: workingDays.includes(dayOfWeek),
+      isHoliday: holidaySet.has(date),
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return days;
 }
 
 export function formatScheduleDate(date: string): string {

@@ -1,15 +1,22 @@
-import type { ScheduleFull } from "@/lib/database/production-schedules";
+import { buildPdfBrandFromSettings } from "@/lib/settings/defaults";
+import type { AppSettingsData } from "@/lib/settings/types";
 import {
   buildTimelineWeeks,
   daysBetween,
+  formatScheduleDate,
   parseDate,
-  parseScheduleData,
 } from "@/lib/production-schedules/calculations";
-import { MILESTONE_COLORS } from "@/lib/production-schedules/constants";
-import { getPdfBrand } from "@/lib/settings/loader";
-import { formatPdfDate } from "@/lib/pdf/quote/styles";
-import { PDF_PHASE_COLORS } from "./constants";
-import type { SchedulePdfData } from "./types";
+import {
+  MILESTONE_COLORS,
+  type ScheduleFormDraft,
+} from "@/lib/production-schedules/constants";
+import type { SchedulePdfData } from "@/lib/pdf/schedule/types";
+
+export type SchedulePreviewMeta = {
+  clientName?: string;
+  versionNumber?: number;
+  createdDate?: string;
+};
 
 function daysFromStart(startDate: string, targetDate: string): number {
   const start = parseDate(startDate);
@@ -25,13 +32,15 @@ function toPercent(value: number, total: number): number {
   return Math.min(100, Math.max(0, (value / total) * 100));
 }
 
-export async function buildSchedulePdfData(
-  schedule: ScheduleFull,
-): Promise<SchedulePdfData> {
-  const brand = await getPdfBrand();
-  const scheduleData = parseScheduleData(schedule.schedule_json);
-  const startDate = schedule.start_date ?? "";
-  const deliveryDate = schedule.delivery_date ?? "";
+export function buildSchedulePreviewData(
+  draft: ScheduleFormDraft,
+  settings: AppSettingsData,
+  meta: SchedulePreviewMeta = {},
+): SchedulePdfData {
+  const brand = buildPdfBrandFromSettings(settings);
+  const { scheduleData } = draft;
+  const startDate = draft.startDate;
+  const deliveryDate = draft.deliveryDate;
   const totalDurationDays =
     startDate && deliveryDate ? daysBetween(startDate, deliveryDate) : 0;
 
@@ -40,7 +49,7 @@ export async function buildSchedulePdfData(
     startDate: week.startDate,
     endDate: week.endDate,
     label: week.label,
-    dateLabel: formatPdfDate(week.startDate),
+    dateLabel: formatScheduleDate(week.startDate),
     widthPercent: toPercent(
       daysBetween(week.startDate, week.endDate),
       totalDurationDays,
@@ -55,7 +64,7 @@ export async function buildSchedulePdfData(
       startDate: phase.startDate,
       endDate: phase.endDate,
       durationDays: phase.durationDays,
-      color: phase.color ?? PDF_PHASE_COLORS[0],
+      color: phase.color,
       leftPercent: toPercent(offsetDays, totalDurationDays),
       widthPercent: toPercent(phase.durationDays, totalDurationDays),
     };
@@ -76,21 +85,21 @@ export async function buildSchedulePdfData(
     ),
   }));
 
-  const deliverables = (schedule.deliverables ?? []).filter((item) =>
-    item.trim(),
-  );
+  const deliverables = draft.deliverables.filter((item) => item.trim());
 
   return {
-    clientName: schedule.company?.company_name ?? "Client",
-    projectTitle: schedule.project_title || "Production Schedule",
-    versionNumber: schedule.current_version,
-    createdDate: formatPdfDate(schedule.created_at),
-    startDate: startDate ? formatPdfDate(startDate) : "—",
-    deliveryDate: deliveryDate ? formatPdfDate(deliveryDate) : "—",
-    reviewRounds: schedule.review_rounds,
+    clientName: draft.clientName.trim() || scheduleData.clientName || meta.clientName || "Client",
+    projectTitle: draft.projectTitle.trim() || "Production Schedule",
+    versionNumber: meta.versionNumber ?? 1,
+    createdDate: meta.createdDate
+      ? formatScheduleDate(meta.createdDate)
+      : formatScheduleDate(new Date().toISOString()),
+    startDate: startDate ? formatScheduleDate(startDate) : "—",
+    deliveryDate: deliveryDate ? formatScheduleDate(deliveryDate) : "—",
+    reviewRounds: draft.reviewRounds,
     totalDurationDays,
     deliverables,
-    notes: schedule.notes,
+    notes: draft.notes.trim() || null,
     agencyName: brand.agencyName,
     tagline: brand.tagline,
     email: brand.email,

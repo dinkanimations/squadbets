@@ -1,108 +1,301 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Archive, ArrowLeft, RefreshCw, Save, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { PhaseEditor } from "./PhaseEditor";
-import { MilestoneEditor } from "./MilestoneEditor";
-import { ScheduleTimeline } from "./ScheduleTimeline";
-import { ScheduleStatusBadge } from "./ScheduleStatusBadge";
-import { ScheduleVersionPanel } from "./ScheduleVersionPanel";
-import { SchedulePdfPanel } from "./SchedulePdfPanel";
+import { useRouter } from "next/navigation";
 import {
-  archiveScheduleAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowLeft,
+  Download,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Save,
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
+import { SaveToast } from "@/components/quotes/SaveToast";
+import { ScheduleDeliverablesBar } from "./ScheduleDeliverablesBar";
+import { ScheduleHeaderBar } from "./ScheduleHeaderBar";
+import { ScheduleLivePreview } from "./ScheduleLivePreview";
+import { ScheduleTimelineEditor } from "./ScheduleTimelineEditor";
+import {
   createScheduleAction,
-  getOpportunitiesForScheduleAction,
-  getQuotesForScheduleAction,
-  regenerateScheduleAction,
   updateScheduleAction,
 } from "@/lib/production-schedules/actions";
+import { regenerateSchedulePdfAction } from "@/lib/production-schedules/pdf-actions";
 import {
   createEmptyScheduleDraft,
-  SCHEDULE_STATUSES,
-  SCHEDULE_STATUS_LABELS,
+  normalizeScheduleData,
   type ScheduleFormDraft,
 } from "@/lib/production-schedules/constants";
+import { serializeScheduleDraft } from "@/lib/production-schedules/draft-serializer";
 import { generateScheduleData } from "@/lib/production-schedules/generate";
-import { formatScheduleDate } from "@/lib/production-schedules/calculations";
-import type { ProductionScheduleVersion, ScheduleStatus } from "@/types/database";
+import { buildSchedulePreviewData } from "@/lib/production-schedules/preview-data";
+import type { AppSettingsData } from "@/lib/settings/types";
+import { cn } from "@/lib/utils/cn";
 
-type CompanyOption = { id: string; company_name: string };
-type OpportunityOption = { id: string; subject: string | null; company_id: string };
-type QuoteOption = { id: string; quote_number: string; company_id: string | null };
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 interface ScheduleBuilderProps {
-  mode: "create" | "edit";
   scheduleId?: string;
   createdAt?: string;
   currentVersion?: number;
-  versions?: ProductionScheduleVersion[];
   initialDraft?: ScheduleFormDraft;
+  settings: AppSettingsData;
   defaultPhaseNames?: string[];
   defaultPhaseWeights?: Record<string, number>;
-  companies: CompanyOption[];
-  initialOpportunities?: OpportunityOption[];
-  initialQuotes?: QuoteOption[];
+}
+
+function formatLastSaved(date: Date): string {
+  if (Date.now() - date.getTime() < 60_000) return "Just now";
+  return date.toLocaleString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function ScheduleBuilder({
-  mode,
-  scheduleId,
+  scheduleId: initialScheduleId,
   createdAt,
   currentVersion = 1,
-  versions = [],
   initialDraft,
+  settings,
   defaultPhaseNames,
   defaultPhaseWeights,
-  companies,
-  initialOpportunities = [],
-  initialQuotes = [],
 }: ScheduleBuilderProps) {
   const router = useRouter();
-  const [draft, setDraft] = useState<ScheduleFormDraft>(
-    initialDraft ?? createEmptyScheduleDraft(),
+  const startingDraft = initialDraft ?? createEmptyScheduleDraft();
+  const [draft, setDraft] = useState<ScheduleFormDraft>(startingDraft);
+  const [activeScheduleId, setActiveScheduleId] = useState(initialScheduleId);
+  const [activeVersion, setActiveVersion] = useState(currentVersion);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(
+    createdAt ? new Date(createdAt) : null,
   );
-  const [opportunities, setOpportunities] =
-    useState<OpportunityOption[]>(initialOpportunities);
-  const [quotes, setQuotes] = useState<QuoteOption[]>(initialQuotes);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [lastSavedLabel, setLastSavedLabel] = useState(
+    createdAt ? formatLastSaved(new Date(createdAt)) : "",
+  );
+  const [, setRelativeTimeTick] = useState(0);
 
-  const updateDraft = (patch: Partial<ScheduleFormDraft>) => {
+  const skipAutoSave = useRef(true);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftRef = useRef(draft);
+  const activeScheduleIdRef = useRef(activeScheduleId);
+  const savedSnapshotRef = useRef(serializeScheduleDraft(startingDraft));
+  const saveChainRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const seededRef = useRef(
+    startingDraft.scheduleData.phases.length > 0,
+  );
+
+  draftRef.current = draft;
+  activeScheduleIdRef.current = activeScheduleId;
+
+  const isDirty = useMemo(
+    () => serializeScheduleDraft(draft) !== savedSnapshotRef.current,
+    [draft],
+  );
+
+  const previewData = useMemo(
+    () =>
+      buildSchedulePreviewData(draft, settings, {
+        versionNumber: activeVersion,
+        createdDate: createdAt,
+      }),
+    [draft, settings, activeVersion, createdAt],
+  );
+
+  const updateDraft = useCallback((patch: Partial<ScheduleFormDraft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
-  };
+    setSaveState("idle");
+  }, []);
 
-  const handleCompanyChange = (companyId: string) => {
-    updateDraft({
-      companyId,
-      opportunityId: "",
-      quoteId: "",
+  const showToast = useCallback(
+    (message: string, type: "success" | "error") => {
+      setToast({ message, type });
+    },
+    [],
+  );
+
+  const clearPendingAutoSave = useCallback(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+  }, []);
+
+  const ensureGeneratedSchedule = useCallback(() => {
+    if (draftRef.current.scheduleData.phases.length > 0) return;
+    if (!draftRef.current.startDate || !draftRef.current.deliveryDate) return;
+
+    const generated = generateScheduleData({
+      startDate: draftRef.current.startDate,
+      deliveryDate: draftRef.current.deliveryDate,
+      reviewRounds: draftRef.current.reviewRounds,
+      phaseNames: defaultPhaseNames,
+      phaseWeights: defaultPhaseWeights,
     });
 
-    if (!companyId) {
-      setOpportunities([]);
-      setQuotes([]);
+    updateDraft({
+      scheduleData: normalizeScheduleData({
+        ...generated,
+        workingDays: settings.workingDays,
+        companyHolidays: settings.companyHolidays,
+        shutdownPeriods: [],
+        milestoneLegend: draftRef.current.scheduleData.milestoneLegend,
+      }),
+    });
+  }, [defaultPhaseNames, defaultPhaseWeights, settings, updateDraft]);
+
+  useEffect(() => {
+    if (!seededRef.current) {
+      seededRef.current = true;
+      ensureGeneratedSchedule();
+    }
+  }, [ensureGeneratedSchedule]);
+
+  const markSaved = useCallback(
+    (options?: { manual?: boolean; nextVersion?: number }) => {
+      const savedAt = new Date();
+      savedSnapshotRef.current = serializeScheduleDraft(draftRef.current);
+      setLastSavedAt(savedAt);
+      setLastSavedLabel("Just now");
+      setSaveState("saved");
+      if (options?.nextVersion) {
+        setActiveVersion(options.nextVersion);
+      }
+      if (options?.manual) {
+        showToast("Draft saved successfully.", "success");
+      }
+    },
+    [showToast],
+  );
+
+  const persistSchedule = useCallback(
+    (options?: { manual?: boolean }) => {
+      const runSave = async (): Promise<boolean> => {
+        clearPendingAutoSave();
+        setSaveState("saving");
+
+        const payload = {
+          ...draftRef.current,
+          companyId: draftRef.current.companyId || null,
+        };
+
+        try {
+          const scheduleId = activeScheduleIdRef.current;
+
+          if (!scheduleId) {
+            const result = await createScheduleAction(JSON.stringify(payload));
+            if (result.error) {
+              setSaveState("error");
+              if (options?.manual) showToast(result.error, "error");
+              return false;
+            }
+
+            if (result.id) {
+              activeScheduleIdRef.current = result.id;
+              setActiveScheduleId(result.id);
+              setActiveVersion(1);
+              window.history.replaceState(
+                null,
+                "",
+                `/production-schedules/${result.id}`,
+              );
+            }
+          } else {
+            const result = await updateScheduleAction(
+              scheduleId,
+              JSON.stringify(payload),
+            );
+            if (result.error) {
+              setSaveState("error");
+              if (options?.manual) showToast(result.error, "error");
+              return false;
+            }
+            markSaved({
+              manual: options?.manual,
+              nextVersion: activeVersion + 1,
+            });
+            router.refresh();
+            return true;
+          }
+
+          markSaved(options);
+          router.refresh();
+          return true;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Failed to save schedule.";
+          setSaveState("error");
+          if (options?.manual) showToast(message, "error");
+          return false;
+        }
+      };
+
+      saveChainRef.current = saveChainRef.current
+        .then(() => runSave())
+        .catch(() => false);
+
+      return saveChainRef.current;
+    },
+    [activeVersion, clearPendingAutoSave, markSaved, router, showToast],
+  );
+
+  useEffect(() => {
+    if (skipAutoSave.current) {
+      skipAutoSave.current = false;
       return;
     }
 
-    void getOpportunitiesForScheduleAction(companyId).then(setOpportunities);
-    void getQuotesForScheduleAction(companyId).then(setQuotes);
+    clearPendingAutoSave();
+    saveTimer.current = setTimeout(() => {
+      void persistSchedule();
+    }, 1200);
+
+    return clearPendingAutoSave;
+  }, [clearPendingAutoSave, draft, persistSchedule]);
+
+  useEffect(() => {
+    if (!lastSavedAt) return;
+    const interval = setInterval(() => {
+      setLastSavedLabel(formatLastSaved(lastSavedAt));
+      setRelativeTimeTick((value) => value + 1);
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, [lastSavedAt]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty || saveState === "saving") return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty, saveState]);
+
+  const handleSaveDraft = () => {
+    clearPendingAutoSave();
+    void persistSchedule({ manual: true });
   };
 
-  const handleAutoGenerate = () => {
+  const handleRegenerate = () => {
     if (!draft.startDate || !draft.deliveryDate) {
-      setError("Set start and delivery dates before generating.");
+      showToast("Set start and delivery dates first.", "error");
       return;
     }
 
-    const scheduleData = generateScheduleData({
+    const generated = generateScheduleData({
       startDate: draft.startDate,
       deliveryDate: draft.deliveryDate,
       reviewRounds: draft.reviewRounds,
@@ -110,345 +303,165 @@ export function ScheduleBuilder({
       phaseWeights: defaultPhaseWeights,
     });
 
-    updateDraft({ scheduleData });
-    setSuccess("Schedule generated from dates and review rounds.");
-    setError(null);
-  };
-
-  const handleSave = () => {
-    setError(null);
-    setSuccess(null);
-
-    startTransition(async () => {
-      const payload = JSON.stringify(draft);
-
-      if (mode === "create") {
-        const result = await createScheduleAction(payload);
-        if (result.error) {
-          setError(result.error);
-        } else if (result.id) {
-          router.push(`/production-schedules/${result.id}`);
-        }
-        return;
-      }
-
-      if (!scheduleId) return;
-
-      const result = await updateScheduleAction(scheduleId, payload);
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setSuccess(result.success ?? "Schedule saved.");
-        router.refresh();
-      }
+    updateDraft({
+      scheduleData: normalizeScheduleData({
+        ...generated,
+        workingDays: draft.scheduleData.workingDays,
+        companyHolidays: draft.scheduleData.companyHolidays,
+        shutdownPeriods: draft.scheduleData.shutdownPeriods,
+        milestoneLegend: draft.scheduleData.milestoneLegend,
+      }),
     });
+    showToast("Timeline regenerated from dates.", "success");
   };
 
-  const handleRegenerate = () => {
-    if (!scheduleId) {
-      handleAutoGenerate();
+  const handleGeneratePdf = async () => {
+    if (!activeScheduleId) {
+      showToast("Save the schedule before generating a PDF.", "error");
       return;
     }
 
-    setError(null);
-    setSuccess(null);
-
-    startTransition(async () => {
-      const result = await regenerateScheduleAction(
-        scheduleId,
-        JSON.stringify(draft),
-      );
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setSuccess(result.success ?? "Schedule regenerated.");
-        router.refresh();
-      }
-    });
+    const result = await regenerateSchedulePdfAction(activeScheduleId);
+    if (result.error) {
+      showToast(result.error, "error");
+    } else {
+      showToast(result.success ?? "PDF generated.", "success");
+      router.refresh();
+    }
   };
 
-  const handleArchive = () => {
-    if (!scheduleId || !window.confirm("Archive this schedule?")) return;
-
-    startTransition(async () => {
-      const result = await archiveScheduleAction(scheduleId);
-      if (result?.error) setError(result.error);
-    });
-  };
-
-  const updateDeliverable = (index: number, value: string) => {
-    const next = [...draft.deliverables];
-    next[index] = value;
-    updateDraft({ deliverables: next });
-  };
-
-  const addDeliverable = () => {
-    updateDraft({ deliverables: [...draft.deliverables, ""] });
-  };
-
-  const removeDeliverable = (index: number) => {
-    if (draft.deliverables.length <= 1) return;
-    updateDraft({
-      deliverables: draft.deliverables.filter((_, i) => i !== index),
-    });
-  };
+  const downloadUrl = activeScheduleId
+    ? `/api/production-schedules/${activeScheduleId}/pdf?download=1&save=1`
+    : undefined;
 
   return (
-    <>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-4">
+      {toast ? (
+        <SaveToast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
+      ) : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href="/production-schedules"
+          onClick={(event) => {
+            if (!isDirty || saveState === "saving") return;
+            if (
+              !window.confirm(
+                "You have unsaved changes. Leave this page without saving?",
+              )
+            ) {
+              event.preventDefault();
+            }
+          }}
           className="inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Schedules
         </Link>
 
+        <div className="flex flex-col items-end gap-1 text-xs text-muted">
+          <div className="flex items-center gap-2">
+            {saveState === "saving" && (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Saving...
+              </>
+            )}
+            {saveState === "saved" && !isDirty && (
+              <span className="text-success">All changes saved</span>
+            )}
+            {isDirty && saveState !== "saving" && (
+              <span>Unsaved changes</span>
+            )}
+          </div>
+          {lastSavedAt ? <span>Last saved: {lastSavedLabel}</span> : null}
+        </div>
+      </div>
+
+      <ScheduleDeliverablesBar
+        deliverables={draft.deliverables}
+        onChange={(deliverables) => updateDraft({ deliverables })}
+      />
+
+      <ScheduleHeaderBar
+        projectTitle={draft.projectTitle}
+        clientName={draft.clientName}
+        startDate={draft.startDate}
+        deliveryDate={draft.deliveryDate}
+        onProjectTitleChange={(projectTitle) => updateDraft({ projectTitle })}
+        onClientNameChange={(clientName) => updateDraft({ clientName })}
+        onStartDateChange={(startDate) => updateDraft({ startDate })}
+        onDeliveryDateChange={(deliveryDate) => updateDraft({ deliveryDate })}
+      />
+
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+        <div className="space-y-4 overflow-y-auto pb-4">
+          <ScheduleTimelineEditor
+            startDate={draft.startDate}
+            deliveryDate={draft.deliveryDate}
+            scheduleData={draft.scheduleData}
+            onChange={(scheduleData) => updateDraft({ scheduleData })}
+          />
+
+          <Textarea
+            label="Notes"
+            rows={3}
+            value={draft.notes}
+            onChange={(event) => updateDraft({ notes: event.target.value })}
+          />
+        </div>
+
+        <ScheduleLivePreview data={previewData} />
+      </div>
+
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="secondary" onClick={handleSaveDraft}>
+            {saveState === "saving" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Save Draft
+          </Button>
+
+          <Button type="button" variant="secondary" onClick={handleRegenerate}>
+            <RefreshCw className="h-4 w-4" />
+            Regenerate Timeline
+          </Button>
+
           <Button
             type="button"
-            variant="secondary"
-            disabled={isPending}
-            onClick={handleRegenerate}
+            disabled={!activeScheduleId}
+            onClick={() => void handleGeneratePdf()}
           >
-            <RefreshCw className="h-4 w-4" />
-            {mode === "create" ? "Auto-Generate" : "Regenerate"}
+            <FileText className="h-4 w-4" />
+            Generate PDF
           </Button>
-          {mode === "edit" && (
-            <Button
-              type="button"
-              variant="danger"
-              disabled={isPending}
-              onClick={handleArchive}
+
+          {downloadUrl ? (
+            <a
+              href={downloadUrl}
+              download={`${draft.projectTitle || "schedule"}.pdf`}
+              className={cn(
+                "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface-elevated px-4 text-sm font-medium text-foreground transition-colors hover:border-border-hover",
+              )}
             >
-              <Archive className="h-4 w-4" />
-              Archive
+              <Download className="h-4 w-4" />
+              Download PDF
+            </a>
+          ) : (
+            <Button type="button" variant="secondary" disabled>
+              <Download className="h-4 w-4" />
+              Download PDF
             </Button>
           )}
-          <Button type="button" disabled={isPending} onClick={handleSave}>
-            <Save className="h-4 w-4" />
-            {isPending ? "Saving..." : "Save Schedule"}
-          </Button>
         </div>
       </div>
-
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {mode === "create"
-              ? "New Production Schedule"
-              : draft.projectTitle}
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            {mode === "create"
-              ? "Auto-generate phases and milestones from your dates"
-              : `Created ${createdAt ? formatScheduleDate(createdAt) : ""} · v${currentVersion}`}
-          </p>
-        </div>
-        <ScheduleStatusBadge status={draft.status} />
-      </div>
-
-      {(error || success) && (
-        <p
-          className={`mb-4 rounded-lg px-3 py-2 text-sm ${
-            error ? "bg-danger/10 text-danger" : "bg-success/10 text-success"
-          }`}
-        >
-          {error ?? success}
-        </p>
-      )}
-
-      <div className="space-y-6">
-        <Card>
-          <CardHeader
-            title="Schedule Details"
-            description="Link to company, opportunity, quote, and project"
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Project Title"
-              value={draft.projectTitle}
-              onChange={(e) => updateDraft({ projectTitle: e.target.value })}
-              placeholder="e.g. Brand Film Production"
-            />
-            <Select
-              label="Status"
-              value={draft.status}
-              onChange={(e) =>
-                updateDraft({ status: e.target.value as ScheduleStatus })
-              }
-              options={SCHEDULE_STATUSES.map((s) => ({
-                value: s,
-                label: SCHEDULE_STATUS_LABELS[s],
-              }))}
-            />
-            <Select
-              label="Company"
-              value={draft.companyId}
-              onChange={(e) => handleCompanyChange(e.target.value)}
-              options={[
-                { value: "", label: "Select company" },
-                ...companies.map((c) => ({
-                  value: c.id,
-                  label: c.company_name,
-                })),
-              ]}
-            />
-            <Select
-              label="Opportunity"
-              value={draft.opportunityId}
-              onChange={(e) => updateDraft({ opportunityId: e.target.value })}
-              options={[
-                { value: "", label: "No opportunity" },
-                ...opportunities.map((o) => ({
-                  value: o.id,
-                  label: o.subject ?? "Untitled",
-                })),
-              ]}
-              disabled={!draft.companyId}
-            />
-            <Select
-              label="Quote"
-              value={draft.quoteId}
-              onChange={(e) => updateDraft({ quoteId: e.target.value })}
-              options={[
-                { value: "", label: "No quote" },
-                ...quotes.map((q) => ({
-                  value: q.id,
-                  label: q.quote_number,
-                })),
-              ]}
-              disabled={!draft.companyId}
-            />
-            <Input
-              label="Review Rounds"
-              type="number"
-              min="1"
-              max="10"
-              value={draft.reviewRounds}
-              onChange={(e) =>
-                updateDraft({ reviewRounds: Number(e.target.value) || 1 })
-              }
-            />
-            <Input
-              label="Start Date"
-              type="date"
-              value={draft.startDate}
-              onChange={(e) => updateDraft({ startDate: e.target.value })}
-            />
-            <Input
-              label="Delivery Date"
-              type="date"
-              value={draft.deliveryDate}
-              onChange={(e) => updateDraft({ deliveryDate: e.target.value })}
-            />
-          </div>
-
-          <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">
-                Deliverables
-              </span>
-              <Button type="button" variant="ghost" size="sm" onClick={addDeliverable}>
-                Add
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {draft.deliverables.map((item, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={item}
-                    onChange={(e) => updateDeliverable(index, e.target.value)}
-                    placeholder="Deliverable description"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeDeliverable(index)}
-                    disabled={draft.deliverables.length <= 1}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <Textarea
-              label="Notes"
-              rows={3}
-              value={draft.notes}
-              onChange={(e) => updateDraft({ notes: e.target.value })}
-            />
-          </div>
-
-          {draft.scheduleData.phases.length === 0 && (
-            <div className="mt-4">
-              <Button type="button" variant="secondary" onClick={handleAutoGenerate}>
-                <Sparkles className="h-4 w-4" />
-                Generate Schedule from Dates
-              </Button>
-            </div>
-          )}
-        </Card>
-
-        {draft.scheduleData.phases.length > 0 && (
-          <>
-            <ScheduleTimeline
-              startDate={draft.startDate}
-              deliveryDate={draft.deliveryDate}
-              phases={draft.scheduleData.phases}
-              milestones={draft.scheduleData.milestones}
-              onPhasesChange={(phases) =>
-                updateDraft({
-                  scheduleData: { ...draft.scheduleData, phases },
-                })
-              }
-              onMilestonesChange={(milestones) =>
-                updateDraft({
-                  scheduleData: { ...draft.scheduleData, milestones },
-                })
-              }
-            />
-
-            <PhaseEditor
-              phases={draft.scheduleData.phases}
-              onChange={(phases) =>
-                updateDraft({
-                  scheduleData: { ...draft.scheduleData, phases },
-                })
-              }
-            />
-
-            <MilestoneEditor
-              milestones={draft.scheduleData.milestones}
-              onChange={(milestones) =>
-                updateDraft({
-                  scheduleData: { ...draft.scheduleData, milestones },
-                })
-              }
-            />
-          </>
-        )}
-
-        {mode === "edit" && scheduleId && (
-          <SchedulePdfPanel
-            scheduleId={scheduleId}
-            projectTitle={draft.projectTitle}
-            disabled={isPending}
-          />
-        )}
-
-        {mode === "edit" && scheduleId && versions.length > 0 && (
-          <ScheduleVersionPanel
-            scheduleId={scheduleId}
-            versions={versions}
-            currentVersion={currentVersion}
-          />
-        )}
-      </div>
-    </>
+    </div>
   );
 }

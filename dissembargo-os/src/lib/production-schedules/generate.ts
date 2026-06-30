@@ -1,6 +1,8 @@
 import {
   DEFAULT_PHASES,
   MILESTONE_TYPE_LABELS,
+  MILESTONE_COLORS,
+  PHASE_COLORS,
   PHASE_WEIGHTS,
   type ScheduleData,
   type ScheduleMilestone,
@@ -29,6 +31,7 @@ function createPhase(
     durationDays: Math.max(1, durationDays),
     sortOrder,
     notes: "",
+    color: PHASE_COLORS[sortOrder % PHASE_COLORS.length],
   };
 }
 
@@ -45,6 +48,7 @@ function createMilestone(
     date,
     sortOrder,
     notes: "",
+    color: MILESTONE_COLORS[type],
   };
 }
 
@@ -54,7 +58,7 @@ export function generateScheduleData(input: {
   reviewRounds: number;
   phaseNames?: string[];
   phaseWeights?: Record<string, number>;
-}): ScheduleData {
+}): Pick<ScheduleData, "phases" | "milestones"> {
   const start = parseDate(input.startDate);
   const end = parseDate(input.deliveryDate);
   const totalDays = daysBetween(input.startDate, input.deliveryDate);
@@ -194,5 +198,41 @@ export function resizePhase(
     ...phase,
     durationDays,
     endDate: formatDateISO(end),
+  };
+}
+
+export function resizePhaseFromStart(
+  phase: SchedulePhase,
+  newStartDate: string,
+): SchedulePhase {
+  const start = parseDate(newStartDate);
+  const end = parseDate(phase.endDate);
+  if (start > end) {
+    const date = formatDateISO(start);
+    return { ...phase, startDate: date, endDate: date, durationDays: 1 };
+  }
+  const durationDays = daysBetween(formatDateISO(start), phase.endDate);
+  return {
+    ...phase,
+    startDate: formatDateISO(start),
+    durationDays,
+  };
+}
+
+export function resizePhaseToEnd(
+  phase: SchedulePhase,
+  newEndDate: string,
+): SchedulePhase {
+  const start = parseDate(phase.startDate);
+  const end = parseDate(newEndDate);
+  if (end < start) {
+    const date = formatDateISO(end);
+    return { ...phase, startDate: date, endDate: date, durationDays: 1 };
+  }
+  const durationDays = daysBetween(phase.startDate, formatDateISO(end));
+  return {
+    ...phase,
+    endDate: formatDateISO(end),
+    durationDays,
   };
 }

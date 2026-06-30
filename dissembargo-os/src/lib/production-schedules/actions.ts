@@ -13,7 +13,10 @@ import {
   updateScheduleRecord,
 } from "@/lib/database/production-schedules";
 import { generateScheduleData } from "@/lib/production-schedules/generate";
-import type { ScheduleFormDraft } from "@/lib/production-schedules/constants";
+import {
+  normalizeScheduleData,
+  type ScheduleFormDraft,
+} from "@/lib/production-schedules/constants";
 import type { ScheduleStatus } from "@/types/database";
 
 export type ScheduleActionState = {
@@ -25,7 +28,7 @@ function parsePayload(raw: string): ScheduleFormDraft {
   const parsed = JSON.parse(raw) as ScheduleFormDraft;
 
   if (!parsed.projectTitle?.trim()) {
-    throw new Error("Project title is required.");
+    parsed.projectTitle = "Untitled Schedule";
   }
   if (!parsed.startDate || !parsed.deliveryDate) {
     throw new Error("Start and delivery dates are required.");
@@ -39,6 +42,26 @@ function parsePayload(raw: string): ScheduleFormDraft {
 
 function mapDeliverables(deliverables: string[]): string[] {
   return deliverables.map((d) => d.trim()).filter(Boolean);
+}
+
+function resolveScheduleData(payload: ScheduleFormDraft) {
+  const base =
+    payload.scheduleData.phases.length > 0
+      ? payload.scheduleData
+      : generateScheduleData({
+          startDate: payload.startDate,
+          deliveryDate: payload.deliveryDate,
+          reviewRounds: payload.reviewRounds,
+        });
+
+  return normalizeScheduleData({
+    ...base,
+    workingDays: payload.scheduleData.workingDays,
+    companyHolidays: payload.scheduleData.companyHolidays,
+    shutdownPeriods: payload.scheduleData.shutdownPeriods,
+    milestoneLegend: payload.scheduleData.milestoneLegend,
+    clientName: payload.clientName.trim() || undefined,
+  });
 }
 
 export async function getCompaniesForScheduleAction() {
@@ -70,14 +93,7 @@ export async function createScheduleAction(
 ): Promise<{ id?: string; error?: string }> {
   try {
     const payload = parsePayload(payloadJson);
-    const scheduleData =
-      payload.scheduleData.phases.length > 0
-        ? payload.scheduleData
-        : generateScheduleData({
-            startDate: payload.startDate,
-            deliveryDate: payload.deliveryDate,
-            reviewRounds: payload.reviewRounds,
-          });
+    const scheduleData = resolveScheduleData(payload);
 
     const schedule = await createScheduleRecord({
       company_id: payload.companyId || null,
@@ -98,6 +114,7 @@ export async function createScheduleAction(
     await saveScheduleVersion(schedule.id, 1, scheduleData, "Initial schedule");
 
     revalidatePath("/production-schedules");
+    revalidatePath(`/production-schedules/${schedule.id}`);
     revalidatePath("/");
 
     return { id: schedule.id };
@@ -117,6 +134,7 @@ export async function updateScheduleAction(
     const payload = parsePayload(payloadJson);
     const existing = await getScheduleFullById(scheduleId);
     const nextVersion = existing.current_version + 1;
+    const scheduleData = resolveScheduleData(payload);
 
     await updateScheduleRecord(scheduleId, {
       company_id: payload.companyId || null,
@@ -131,13 +149,13 @@ export async function updateScheduleAction(
       notes: payload.notes.trim() || null,
       status: payload.status,
       current_version: nextVersion,
-      schedule_json: payload.scheduleData,
+      schedule_json: scheduleData,
     });
 
     await saveScheduleVersion(
       scheduleId,
       nextVersion,
-      payload.scheduleData,
+      scheduleData,
       "Schedule updated",
     );
 

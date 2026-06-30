@@ -1,6 +1,6 @@
 "use client";
 
-import type { SchedulePhase } from "@/lib/production-schedules/constants";
+import { createEmptyPhase, type SchedulePhase } from "@/lib/production-schedules/constants";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -38,18 +38,7 @@ export function PhaseEditor({ phases, onChange }: PhaseEditorProps) {
   const add = () => {
     const last = phases[phases.length - 1];
     const startDate = last?.endDate ?? new Date().toISOString().split("T")[0];
-    onChange([
-      ...phases,
-      {
-        id: crypto.randomUUID(),
-        name: "New Phase",
-        startDate,
-        endDate: startDate,
-        durationDays: 1,
-        sortOrder: phases.length,
-        notes: "",
-      },
-    ]);
+    onChange([...phases, createEmptyPhase(startDate, phases.length)]);
   };
 
   const remove = (id: string) => {
