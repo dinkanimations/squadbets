@@ -7,6 +7,23 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
+const PLACEHOLDER_PATTERNS = [
+  /^YOUR_/i,
+  /^your[-_]/i,
+  /^your$/i,
+  /^<.*>$/,
+  /^replace[-_]?me$/i,
+  /^changeme$/i,
+  /^example$/i,
+  /^xxx+$/i,
+];
+
+function isPlaceholder(value) {
+  if (!value || !value.trim()) return true;
+  const trimmed = value.trim();
+  return PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 function loadEnvFile(filePath) {
   if (!existsSync(filePath)) return;
 
@@ -44,16 +61,28 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
 console.log("\n=== Dissembargo OS Auth Environment Check ===\n");
 
+const urlIsPlaceholder = isPlaceholder(url);
+const anonIsPlaceholder = isPlaceholder(anonKey);
+const serviceIsPlaceholder = isPlaceholder(serviceRoleKey);
+
 record(
   "NEXT_PUBLIC_SUPABASE_URL",
-  Boolean(url),
-  url ?? "MISSING",
+  Boolean(url) && !urlIsPlaceholder,
+  !url
+    ? "MISSING"
+    : urlIsPlaceholder
+      ? `PLACEHOLDER (${url}) — replace with your project URL from Supabase Dashboard → Project Settings → API → Project URL`
+      : url,
 );
 
 record(
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  Boolean(anonKey),
-  anonKey ? `set (${anonKey.length} chars)` : "MISSING",
+  Boolean(anonKey) && !anonIsPlaceholder,
+  !anonKey
+    ? "MISSING"
+    : anonIsPlaceholder
+      ? `PLACEHOLDER (${anonKey}) — replace with anon public key from Supabase Dashboard → Project Settings → API → anon public`
+      : `set (${anonKey.length} chars)`,
 );
 
 record(
@@ -66,8 +95,12 @@ record(
 
 record(
   "SUPABASE_SERVICE_ROLE_KEY",
-  Boolean(serviceRoleKey),
-  serviceRoleKey ? `set (${serviceRoleKey.length} chars)` : "MISSING — required for Gmail sync and server jobs",
+  Boolean(serviceRoleKey) && !serviceIsPlaceholder,
+  !serviceRoleKey
+    ? "MISSING"
+    : serviceIsPlaceholder
+      ? `PLACEHOLDER (${serviceRoleKey}) — replace with service_role key from Supabase Dashboard → Project Settings → API → service_role (secret)`
+      : `set (${serviceRoleKey.length} chars)`,
 );
 
 record(
@@ -81,7 +114,7 @@ record(
   disableAuth !== "true",
   disableAuth === "true"
     ? "ENABLED — login is bypassed; set to false for real auth"
-    : `false (real auth enabled)`,
+    : "false (real auth enabled)",
 );
 
 record(
@@ -89,11 +122,18 @@ record(
   disableAuthPublic !== "true",
   disableAuthPublic === "true"
     ? "ENABLED — login is bypassed; set to false for real auth"
-    : `false (real auth enabled)`,
+    : "false (real auth enabled)",
 );
 
-if (!url || !anonKey) {
-  console.log("\nCannot continue without Supabase URL and anon key.\n");
+if (!url || !anonKey || urlIsPlaceholder || anonIsPlaceholder) {
+  console.log(
+    "\nCannot test Supabase until NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY contain real values.\n",
+  );
+  console.log(
+    "Run: node scripts/setup-auth-env.mjs (after exporting your three Supabase values)\n",
+  );
+  const failed = checks.filter((check) => !check.ok).length;
+  console.log(`=== ${failed} check(s) failed ===\n`);
   process.exit(1);
 }
 
@@ -143,5 +183,7 @@ if (healthOk) {
 }
 
 const failed = checks.filter((check) => !check.ok).length;
-console.log(`\n=== ${failed === 0 ? "All checks passed" : `${failed} check(s) failed`} ===\n`);
+console.log(
+  `\n=== ${failed === 0 ? "All checks passed" : `${failed} check(s) failed`} ===\n`,
+);
 process.exit(failed > 0 ? 1 : 0);

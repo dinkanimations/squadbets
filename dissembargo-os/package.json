@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "auth:verify": "node scripts/verify-auth.mjs",
+    "auth:setup": "node scripts/setup-auth-env.mjs",
     "db:types": "supabase gen types typescript --local > src/types/database.generated.ts"
   },
   "dependencies": {
