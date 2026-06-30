@@ -26,7 +26,7 @@ export const DISCOUNT_TYPE_LABELS: Record<DiscountType, string> = {
 };
 
 export const DEFAULT_BUDGET_SECTIONS = [
-  "Studio Leads",
+  "Creative Direction",
   "Design",
   "Modelling",
   "Animation",
@@ -36,6 +36,12 @@ export const DEFAULT_BUDGET_SECTIONS = [
   "Music",
   "Miscellaneous",
 ] as const;
+
+export const DEFAULT_SECTION_LINE_ITEMS: Record<string, string[]> = {
+  "Creative Direction": ["Creative Director", "Producer"],
+};
+
+export const DEFAULT_QUOTE_VERSION = "V1";
 
 export function defaultExpiryDate(): string {
   const date = new Date();
@@ -70,6 +76,7 @@ export type QuoteFormDraft = {
   projectId: string;
   projectTitle: string;
   clientName: string;
+  version: string;
   notes: string;
   status: QuoteStatus;
   discountType: DiscountType;
@@ -79,35 +86,50 @@ export type QuoteFormDraft = {
   budgetSections: BudgetSectionDraft[];
 };
 
-export function createEmptyLineItem(): BudgetLineItemDraft {
+export function createLineItem(
+  description = "",
+  dayRate = 0,
+): BudgetLineItemDraft {
   return {
     id: crypto.randomUUID(),
-    description: "",
-    dayRate: 0,
+    description,
+    dayRate,
     numDays: 0,
   };
+}
+
+export function createEmptyLineItem(): BudgetLineItemDraft {
+  return createLineItem();
 }
 
 export function createDefaultBudgetSections(): BudgetSectionDraft[] {
   return createBudgetSectionsFromNames([...DEFAULT_BUDGET_SECTIONS], {});
 }
 
+function normalizeSectionName(name: string): string {
+  return name === "Studio Leads" ? "Creative Direction" : name;
+}
+
 export function createBudgetSectionsFromNames(
   sectionNames: string[],
   dayRates: Record<string, number>,
 ): BudgetSectionDraft[] {
-  return sectionNames.map((name) => ({
-    id: crypto.randomUUID(),
-    name,
-    lineItems: [
-      {
-        id: crypto.randomUUID(),
-        description: "",
-        dayRate: dayRates[name] ?? 0,
-        numDays: 0,
-      },
-    ],
-  }));
+  return sectionNames.map((rawName) => {
+    const name = normalizeSectionName(rawName);
+    const defaultRoles = DEFAULT_SECTION_LINE_ITEMS[name];
+
+    const lineItems = defaultRoles
+      ? defaultRoles.map((role) =>
+          createLineItem(role, dayRates[role] ?? dayRates[name] ?? 0),
+        )
+      : [createLineItem("", dayRates[name] ?? 0)];
+
+    return {
+      id: crypto.randomUUID(),
+      name,
+      lineItems,
+    };
+  });
 }
 
 export function createEmptyQuoteDraftFromSettings(
@@ -120,6 +142,7 @@ export function createEmptyQuoteDraftFromSettings(
     projectId: "",
     projectTitle: "",
     clientName: "",
+    version: DEFAULT_QUOTE_VERSION,
     notes: "",
     status: "draft",
     discountType: settings.defaultDiscountType,
@@ -127,7 +150,7 @@ export function createEmptyQuoteDraftFromSettings(
     expiryDate: defaultExpiryDateFromDays(settings.quoteValidityDays),
     deliverables: [createEmptyDeliverable()],
     budgetSections: createBudgetSectionsFromNames(
-      settings.defaultBudgetSections,
+      settings.defaultBudgetSections.map(normalizeSectionName),
       settings.defaultDayRates,
     ),
   };
@@ -150,6 +173,7 @@ export function createEmptyQuoteDraft(): QuoteFormDraft {
     projectId: "",
     projectTitle: "",
     clientName: "",
+    version: DEFAULT_QUOTE_VERSION,
     notes: "",
     status: "draft",
     discountType: "fixed",

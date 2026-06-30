@@ -51,6 +51,7 @@ export function QuoteLivePreview({ data }: QuoteLivePreviewProps) {
           <div className="mb-5 grid grid-cols-2 gap-3 text-[10px]">
             <PreviewMeta label="Client" value={data.clientName} />
             <PreviewMeta label="Project" value={data.projectTitle} />
+            <PreviewMeta label="Version" value={data.version ?? "—"} />
             <PreviewMeta label="Date" value={data.issueDate} />
             <PreviewMeta label="Valid Until" value={data.expiryDate} />
           </div>

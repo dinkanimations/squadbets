@@ -731,6 +731,7 @@ export interface Database {
           opportunity_id: string | null;
           project_title: string | null;
           client_name: string | null;
+          version: string | null;
           notes: string | null;
           quote_status: QuoteStatus;
           subtotal: number;
@@ -753,6 +754,7 @@ export interface Database {
           opportunity_id?: string | null;
           project_title?: string | null;
           client_name?: string | null;
+          version?: string | null;
           notes?: string | null;
           quote_status?: QuoteStatus;
           subtotal?: number;
@@ -775,6 +777,7 @@ export interface Database {
           opportunity_id?: string | null;
           project_title?: string | null;
           client_name?: string | null;
+          version?: string | null;
           notes?: string | null;
           quote_status?: QuoteStatus;
           subtotal?: number;

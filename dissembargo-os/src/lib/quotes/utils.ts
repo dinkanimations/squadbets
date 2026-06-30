@@ -1,5 +1,5 @@
 import type { QuoteFull } from "@/lib/database/quotes";
-import { defaultExpiryDate } from "./constants";
+import { defaultExpiryDate, DEFAULT_QUOTE_VERSION } from "./constants";
 import type { QuoteFormDraft } from "./constants";
 
 export function quoteToFormDraft(quote: QuoteFull): QuoteFormDraft {
@@ -10,6 +10,7 @@ export function quoteToFormDraft(quote: QuoteFull): QuoteFormDraft {
     projectId: quote.project_id ?? "",
     projectTitle: quote.project_title ?? "",
     clientName: quote.client_name ?? "",
+    version: quote.version ?? DEFAULT_QUOTE_VERSION,
     notes: quote.notes ?? "",
     status: quote.quote_status,
     discountType: quote.discount_type,
@@ -28,7 +29,10 @@ export function quoteToFormDraft(quote: QuoteFull): QuoteFormDraft {
       quote.budget_sections.length > 0
         ? quote.budget_sections.map((section) => ({
             id: section.id,
-            name: section.name,
+            name:
+              section.name === "Studio Leads"
+                ? "Creative Direction"
+                : section.name,
             lineItems:
               section.line_items.length > 0
                 ? section.line_items.map((item) => ({

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { QuoteBuilder } from "@/components/quotes/QuoteBuilder";
-import { getCompaniesForQuoteAction } from "@/lib/quotes/actions";
 import { getQuoteFullById } from "@/lib/database/quotes";
 import {
   createEmptyDeliverable,
@@ -17,13 +16,9 @@ export default async function QuoteDetailPage({ params }: QuoteDetailPageProps) 
   const { id } = await params;
 
   let quote;
-  let companies;
 
   try {
-    [quote, companies] = await Promise.all([
-      getQuoteFullById(id),
-      getCompaniesForQuoteAction(),
-    ]);
+    quote = await getQuoteFullById(id);
   } catch {
     notFound();
   }
@@ -50,8 +45,8 @@ export default async function QuoteDetailPage({ params }: QuoteDetailPageProps) 
       quoteId={id}
       quoteNumber={quote.quote_number}
       createdAt={quote.created_at}
+      updatedAt={quote.updated_at}
       initialDraft={formDraft}
-      companies={companies}
       settings={settings}
     />
   );

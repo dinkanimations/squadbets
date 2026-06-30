@@ -31,6 +31,12 @@ export function PdfMetaGrid({ data }: { data: QuotePdfData }) {
         <Text style={pdfStyles.metaLabel}>Project</Text>
         <Text style={pdfStyles.metaValue}>{data.projectTitle}</Text>
       </View>
+      {data.version ? (
+        <View style={pdfStyles.metaItem}>
+          <Text style={pdfStyles.metaLabel}>Version</Text>
+          <Text style={pdfStyles.metaValue}>{data.version}</Text>
+        </View>
+      ) : null}
       <View style={pdfStyles.metaItem}>
         <Text style={pdfStyles.metaLabel}>Date</Text>
         <Text style={pdfStyles.metaValue}>{data.issueDate}</Text>

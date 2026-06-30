@@ -80,6 +80,7 @@ export function buildQuotePreviewData(
 
   return {
     quoteNumber: meta.quoteNumber ?? "DRAFT",
+    version: draft.version.trim() || null,
     clientName: draft.clientName.trim() || "Client",
     projectTitle: draft.projectTitle.trim() || "Project Quotation",
     issueDate,

@@ -22,6 +22,7 @@ export type QuotePdfBudgetSection = {
 
 export type QuotePdfData = {
   quoteNumber: string;
+  version: string | null;
   clientName: string;
   projectTitle: string;
   issueDate: string;

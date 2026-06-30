@@ -23,6 +23,7 @@ import type {
   BudgetSectionDraft,
   DeliverableDraft,
 } from "@/lib/quotes/constants";
+import { DEFAULT_QUOTE_VERSION } from "@/lib/quotes/constants";
 import type { DiscountType, QuoteStatus } from "@/types/database";
 
 export type QuoteActionState = {
@@ -31,12 +32,13 @@ export type QuoteActionState = {
 };
 
 export type QuotePayload = {
-  companyId: string;
+  companyId: string | null;
   contactId: string | null;
   opportunityId: string | null;
   projectId: string | null;
   projectTitle: string;
   clientName: string;
+  version: string;
   notes: string;
   status: QuoteStatus;
   discountType: DiscountType;
@@ -47,13 +49,7 @@ export type QuotePayload = {
 };
 
 function parsePayload(raw: string): QuotePayload {
-  const parsed = JSON.parse(raw) as QuotePayload;
-
-  if (!parsed.companyId?.trim()) {
-    throw new Error("Company is required.");
-  }
-
-  return parsed;
+  return JSON.parse(raw) as QuotePayload;
 }
 
 function buildTotals(payload: QuotePayload) {
@@ -126,12 +122,13 @@ export async function createQuoteAction(
 
     const quote = await createQuoteRecord({
       quote_number: quoteNumber,
-      company_id: payload.companyId,
+      company_id: payload.companyId || null,
       contact_id: payload.contactId,
       opportunity_id: payload.opportunityId,
       project_id: payload.projectId,
       project_title: payload.projectTitle.trim() || null,
       client_name: payload.clientName.trim() || null,
+      version: payload.version.trim() || DEFAULT_QUOTE_VERSION,
       notes: payload.notes.trim() || null,
       expiry_date: payload.expiryDate || null,
       quote_status: payload.status,
@@ -166,12 +163,13 @@ export async function updateQuoteAction(
     const { deliverables, sections } = mapChildren(payload);
 
     await updateQuoteRecord(quoteId, {
-      company_id: payload.companyId,
+      company_id: payload.companyId || null,
       contact_id: payload.contactId,
       opportunity_id: payload.opportunityId,
       project_id: payload.projectId,
       project_title: payload.projectTitle.trim() || null,
       client_name: payload.clientName.trim() || null,
+      version: payload.version.trim() || DEFAULT_QUOTE_VERSION,
       notes: payload.notes.trim() || null,
       expiry_date: payload.expiryDate || null,
       quote_status: payload.status,
@@ -224,6 +222,7 @@ export async function duplicateQuoteAction(
       project_id: source.project_id,
       project_title: source.project_title,
       client_name: source.client_name,
+      version: source.version,
       notes: source.notes,
       expiry_date: source.expiry_date,
       quote_status: "draft",

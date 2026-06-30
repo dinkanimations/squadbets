@@ -1,29 +1,26 @@
 "use client";
 
 import { formatQuoteDate } from "@/lib/quotes/calculations";
-import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 
-type CompanyOption = { id: string; company_name: string };
-
 interface QuoteHeaderBarProps {
-  companies: CompanyOption[];
-  companyId: string;
+  clientName: string;
   projectTitle: string;
-  quoteNumber?: string;
+  version: string;
   issueDate?: string;
-  onCompanyChange: (companyId: string) => void;
+  onClientNameChange: (value: string) => void;
   onProjectTitleChange: (value: string) => void;
+  onVersionChange: (value: string) => void;
 }
 
 export function QuoteHeaderBar({
-  companies,
-  companyId,
+  clientName,
   projectTitle,
-  quoteNumber,
+  version,
   issueDate,
-  onCompanyChange,
+  onClientNameChange,
   onProjectTitleChange,
+  onVersionChange,
 }: QuoteHeaderBarProps) {
   const displayDate = issueDate
     ? formatQuoteDate(issueDate)
@@ -31,17 +28,11 @@ export function QuoteHeaderBar({
 
   return (
     <div className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Select
+      <Input
         label="Client"
-        value={companyId}
-        onChange={(event) => onCompanyChange(event.target.value)}
-        options={[
-          { value: "", label: "Select client" },
-          ...companies.map((company) => ({
-            value: company.id,
-            label: company.company_name,
-          })),
-        ]}
+        value={clientName}
+        onChange={(event) => onClientNameChange(event.target.value)}
+        placeholder="Enter client name"
       />
       <Input
         label="Project Name"
@@ -51,9 +42,9 @@ export function QuoteHeaderBar({
       />
       <Input
         label="Version"
-        value={quoteNumber ?? "Draft"}
-        readOnly
-        className="bg-surface-elevated/60"
+        value={version}
+        onChange={(event) => onVersionChange(event.target.value)}
+        placeholder="e.g. V1, Draft, Final"
       />
       <Input
         label="Date"

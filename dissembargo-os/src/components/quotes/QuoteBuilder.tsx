@@ -27,8 +27,6 @@ import { QuoteLivePreview } from "./QuoteLivePreview";
 import {
   createQuoteAction,
   duplicateQuoteAction,
-  getContactsForQuoteAction,
-  getOpportunitiesForQuoteAction,
   updateQuoteAction,
 } from "@/lib/quotes/actions";
 import { regenerateQuotePdfAction } from "@/lib/quotes/pdf-actions";
@@ -42,25 +40,31 @@ import type { AppSettingsData } from "@/lib/settings/types";
 import type { QuoteStatus } from "@/types/database";
 import { cn } from "@/lib/utils/cn";
 
-type CompanyOption = { id: string; company_name: string };
-
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 interface QuoteBuilderProps {
   quoteId?: string;
   quoteNumber?: string;
   createdAt?: string;
+  updatedAt?: string;
   initialDraft?: QuoteFormDraft;
-  companies: CompanyOption[];
   settings: AppSettingsData;
+}
+
+function formatLastSaved(date: Date): string {
+  return date.toLocaleString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 export function QuoteBuilder({
   quoteId: initialQuoteId,
   quoteNumber: initialQuoteNumber,
   createdAt,
+  updatedAt,
   initialDraft,
-  companies,
   settings,
 }: QuoteBuilderProps) {
   const router = useRouter();
@@ -72,9 +76,13 @@ export function QuoteBuilder({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(
+    updatedAt ? new Date(updatedAt) : null,
+  );
   const [isPending, startTransition] = useTransition();
   const skipAutoSave = useRef(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSaving = useRef(false);
 
   const previewData = useMemo(
     () =>
@@ -88,71 +96,77 @@ export function QuoteBuilder({
   const updateDraft = useCallback((patch: Partial<QuoteFormDraft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
     setSaveState("idle");
+    setActionMessage(null);
   }, []);
 
-  const handleCompanyChange = (companyId: string) => {
-    const company = companies.find((item) => item.id === companyId);
-    updateDraft({
-      companyId,
-      contactId: "",
-      opportunityId: "",
-      clientName: company?.company_name ?? "",
-    });
-
-    if (!companyId) return;
-
-    void getContactsForQuoteAction(companyId);
-    void getOpportunitiesForQuoteAction(companyId);
-  };
+  const clearPendingAutoSave = useCallback(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+  }, []);
 
   const persistQuote = useCallback(
-    async (status?: QuoteStatus) => {
-      if (!draft.companyId) {
-        setSaveError("Select a client before saving.");
-        setSaveState("error");
+    async (status?: QuoteStatus, options?: { manual?: boolean }) => {
+      if (isSaving.current) {
         return false;
       }
 
+      isSaving.current = true;
+      clearPendingAutoSave();
       setSaveState("saving");
       setSaveError(null);
+      if (options?.manual) {
+        setActionMessage(null);
+      }
 
       const payload = {
         ...draft,
+        companyId: draft.companyId || null,
         status: status ?? draft.status,
       };
 
-      if (!activeQuoteId) {
-        const result = await createQuoteAction(JSON.stringify(payload));
-        if (result.error) {
-          setSaveError(result.error);
-          setSaveState("error");
-          return false;
-        }
-
-        if (result.id) {
-          setActiveQuoteId(result.id);
-          if (result.quoteNumber) {
-            setActiveQuoteNumber(result.quoteNumber);
+      try {
+        if (!activeQuoteId) {
+          const result = await createQuoteAction(JSON.stringify(payload));
+          if (result.error) {
+            setSaveError(result.error);
+            setSaveState("error");
+            return false;
           }
-          window.history.replaceState(null, "", `/quotes/${result.id}`);
-        }
-      } else {
-        const result = await updateQuoteAction(
-          activeQuoteId,
-          JSON.stringify(payload),
-        );
-        if (result.error) {
-          setSaveError(result.error);
-          setSaveState("error");
-          return false;
-        }
-      }
 
-      setSaveState("saved");
-      router.refresh();
-      return true;
+          if (result.id) {
+            setActiveQuoteId(result.id);
+            if (result.quoteNumber) {
+              setActiveQuoteNumber(result.quoteNumber);
+            }
+            window.history.replaceState(null, "", `/quotes/${result.id}`);
+          }
+        } else {
+          const result = await updateQuoteAction(
+            activeQuoteId,
+            JSON.stringify(payload),
+          );
+          if (result.error) {
+            setSaveError(result.error);
+            setSaveState("error");
+            return false;
+          }
+        }
+
+        const savedAt = new Date();
+        setLastSavedAt(savedAt);
+        setSaveState("saved");
+        if (options?.manual) {
+          setActionMessage("Draft saved successfully.");
+        }
+        router.refresh();
+        return true;
+      } finally {
+        isSaving.current = false;
+      }
     },
-    [activeQuoteId, draft, router],
+    [activeQuoteId, clearPendingAutoSave, draft, router],
   );
 
   useEffect(() => {
@@ -161,35 +175,25 @@ export function QuoteBuilder({
       return;
     }
 
-    if (!draft.companyId) return;
-
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current);
-    }
-
+    clearPendingAutoSave();
     saveTimer.current = setTimeout(() => {
       void persistQuote("draft");
     }, 1200);
 
-    return () => {
-      if (saveTimer.current) {
-        clearTimeout(saveTimer.current);
-      }
-    };
-  }, [draft, persistQuote]);
+    return clearPendingAutoSave;
+  }, [clearPendingAutoSave, draft, persistQuote]);
 
   const handleSaveDraft = () => {
+    clearPendingAutoSave();
     startTransition(async () => {
-      const saved = await persistQuote("draft");
-      if (saved) {
-        setActionMessage("Draft saved.");
-      }
+      await persistQuote("draft", { manual: true });
     });
   };
 
   const handleGeneratePdf = () => {
     if (!activeQuoteId) {
       setSaveError("Save the quote before generating a PDF.");
+      setSaveState("error");
       return;
     }
 
@@ -198,6 +202,7 @@ export function QuoteBuilder({
       const result = await regenerateQuotePdfAction(activeQuoteId);
       if (result.error) {
         setSaveError(result.error);
+        setSaveState("error");
       } else {
         setActionMessage(result.success ?? "PDF generated.");
         router.refresh();
@@ -212,6 +217,7 @@ export function QuoteBuilder({
       const result = await duplicateQuoteAction(activeQuoteId);
       if (result.error) {
         setSaveError(result.error);
+        setSaveState("error");
       } else if (result.id) {
         router.push(`/quotes/${result.id}`);
       }
@@ -238,14 +244,23 @@ export function QuoteBuilder({
           Back to Quotes
         </Link>
 
-        <div className="flex items-center gap-2 text-xs text-muted">
-          {saveState === "saving" && (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Saving...
-            </>
-          )}
-          {saveState === "saved" && <span className="text-success">Saved</span>}
+        <div className="flex flex-col items-end gap-1 text-xs">
+          <div className="flex items-center gap-2 text-muted">
+            {saveState === "saving" && (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Saving...
+              </>
+            )}
+            {saveState === "saved" && !actionMessage && (
+              <span className="text-success">All changes saved</span>
+            )}
+            {lastSavedAt && (
+              <span className="text-muted">
+                Last saved {formatLastSaved(lastSavedAt)}
+              </span>
+            )}
+          </div>
           {saveState === "error" && saveError && (
             <span className="text-danger">{saveError}</span>
           )}
@@ -256,13 +271,13 @@ export function QuoteBuilder({
       </div>
 
       <QuoteHeaderBar
-        companies={companies}
-        companyId={draft.companyId}
+        clientName={draft.clientName}
         projectTitle={draft.projectTitle}
-        quoteNumber={activeQuoteNumber}
+        version={draft.version}
         issueDate={createdAt}
-        onCompanyChange={handleCompanyChange}
+        onClientNameChange={(clientName) => updateDraft({ clientName })}
         onProjectTitleChange={(projectTitle) => updateDraft({ projectTitle })}
+        onVersionChange={(version) => updateDraft({ version })}
       />
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
@@ -296,7 +311,7 @@ export function QuoteBuilder({
           <Button
             type="button"
             variant="secondary"
-            disabled={isPending}
+            disabled={isPending || saveState === "saving"}
             onClick={handleSaveDraft}
           >
             <Save className="h-4 w-4" />
