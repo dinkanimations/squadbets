@@ -25,7 +25,9 @@ function createServiceRoleClient() {
 
 export async function createClient() {
   if (isAuthDisabled()) {
-    return createServiceRoleClient();
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return createServiceRoleClient();
+    }
   }
 
   const cookieStore = await cookies();
