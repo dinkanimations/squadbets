@@ -107,3 +107,6 @@ CREATE INDEX IF NOT EXISTS idx_potential_opportunities_item_type
   ON public.potential_opportunities (item_type, status);
 CREATE INDEX IF NOT EXISTS idx_companies_last_contact_at
   ON public.companies (last_contact_at DESC NULLS LAST);
+
+-- Refresh PostgREST schema cache so the app sees the new table immediately
+NOTIFY pgrst, 'reload schema';

@@ -3,7 +3,9 @@ import { Sparkles } from "lucide-react";
 import { PotentialOpportunityList } from "@/components/inbox/PotentialOpportunityList";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { InboxSetupBanner } from "@/components/setup/InboxSetupBanner";
 import { getPendingPotentialOpportunities } from "@/lib/database/potential-opportunities";
+import { getInboxSchemaHealth } from "@/lib/database/inbox-schema-health";
 import { getUserGmailConnections } from "@/lib/database/gmail-connections";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
@@ -23,15 +25,20 @@ async function InboxContent() {
   >["data"] = [];
   let error: string | null = null;
   let connection = null;
+  let inboxSchemaReady = true;
+  let inboxProjectRef: string | null = null;
 
   try {
-    const [potentialResult, connections] = await Promise.all([
+    const [potentialResult, connections, inboxSchema] = await Promise.all([
       getPendingPotentialOpportunities(),
       getUserGmailConnections(),
+      getInboxSchemaHealth(),
     ]);
 
     opportunities = potentialResult.data;
     connection = connections.length > 0 ? connections[0] : null;
+    inboxSchemaReady = inboxSchema.ready;
+    inboxProjectRef = inboxSchema.projectRef;
   } catch (err) {
     error =
       err instanceof Error
@@ -46,6 +53,10 @@ async function InboxContent() {
         description="Your AI business development assistant — only genuine opportunities and client communications that need action appear here. Everything else stays in Gmail."
         icon={Sparkles}
       />
+
+      {!inboxSchemaReady ? (
+        <InboxSetupBanner projectRef={inboxProjectRef} />
+      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-danger/20 bg-danger/10 p-6 text-sm text-danger">

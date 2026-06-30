@@ -1,7 +1,9 @@
 import { Settings } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
+import { InboxSetupBanner } from "@/components/setup/InboxSetupBanner";
 import { getIntegrationStatusAction } from "@/lib/settings/actions";
+import { getInboxSchemaHealth } from "@/lib/database/inbox-schema-health";
 import { formatGmailIntegrationError } from "@/lib/gmail/errors";
 
 interface IntegrationsPageProps {
@@ -15,7 +17,10 @@ export default async function IntegrationsSettingsPage({
   searchParams,
 }: IntegrationsPageProps) {
   const params = await searchParams;
-  const status = await getIntegrationStatusAction();
+  const [status, inboxSchema] = await Promise.all([
+    getIntegrationStatusAction(),
+    getInboxSchemaHealth(),
+  ]);
 
   let gmailMessage: string | null = null;
   let gmailError: string | null = null;
@@ -37,6 +42,9 @@ export default async function IntegrationsSettingsPage({
         description="Connect Gmail and third-party services to power your workflow."
         icon={Settings}
       />
+      {!inboxSchema.ready ? (
+        <InboxSetupBanner projectRef={inboxSchema.projectRef} />
+      ) : null}
       <IntegrationsPanel
         gmailConnections={status.gmail}
         google={status.google}
